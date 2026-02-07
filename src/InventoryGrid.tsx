@@ -90,6 +90,19 @@ const getCenterCellOffset = (shape) => {
   return { x: centerCol, y: centerRow };
 };
 
+const loadFromLocalStorage = (key, defaultValue) => {
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved === null || saved === undefined || saved === 'undefined') {
+        return defaultValue;
+    }
+    return JSON.parse(saved);
+  } catch (e) {
+    console.error(`Error loading ${key} from localStorage:`, e);
+    return defaultValue;
+  }
+};
+
 // --- Components ---
 
 const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => {
@@ -103,7 +116,10 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
   const [image, setImage] = useState(initialData?.image || null);
   const [imgOffset, setImgOffset] = useState(initialData?.imageConfig ? { x: initialData.imageConfig.x, y: initialData.imageConfig.y } : { x: 0, y: 0 });
   const [imgScale, setImgScale] = useState(initialData?.imageConfig?.scale || 100);
-  const [isDraggingImg, setIsDraggingImg] = useState(false);
+  const [imgPanOffset, setImgPanOffset] = useState(initialData?.imageConfig?.panOffset || { x: 0, y: 0 }); // New pan offset state
+  const [imgZoom, setImgZoom] = useState(initialData?.imageConfig?.zoom || 1); // New zoom state
+  const [isDraggingImg, setIsDraggingImg] = useState(false); // For imgOffset adjustment
+  const [isPanningView, setIsPanningView] = useState(false); // For imgPanOffset adjustment (viewport movement)
   const dragStart = useRef({ x: 0, y: 0 });
 
   const [mode, setMode] = useState('grid'); 
@@ -114,7 +130,7 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
 
   useEffect(() => {
     if(initialData && width === initialData.shape[0].length && height === initialData.shape.length) return;
-    setMatrix(Array(height).fill(null).map(() => Array(width).fill(type === 'item' ? 0 : 1)));
+    setMatrix(Array(height).fill(null).map(() => Array(width).fill(1))); // Default all cells to active
   }, [width, height, type]);
 
   const toggleCell = (r, c) => {
@@ -139,19 +155,59 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
   const startDragImage = (e) => {
     if (mode !== 'image') return;
     e.preventDefault();
-    setIsDraggingImg(true);
-    dragStart.current = { x: e.clientX - imgOffset.x, y: e.clientY - imgOffset.y };
+    if (e.shiftKey) {
+      setIsPanningView(true);
+      dragStart.current = { x: e.clientX - imgPanOffset.x, y: e.clientY - imgPanOffset.y };
+    } else {
+      setIsDraggingImg(true);
+      dragStart.current = { x: e.clientX - imgOffset.x, y: e.clientY - imgOffset.y };
+    }
   };
 
   const onDragImage = (e) => {
-    if (!isDraggingImg) return;
-    setImgOffset({
-      x: e.clientX - dragStart.current.x,
-      y: e.clientY - dragStart.current.y
-    });
+    if (!isDraggingImg && !isPanningView) return;
+
+    if (isPanningView) {
+      setImgPanOffset({
+        x: e.clientX - dragStart.current.x,
+        y: e.clientY - dragStart.current.y
+      });
+    } else if (isDraggingImg) {
+      let newY = e.clientY - dragStart.current.y;
+
+      // Calculate vertical snapping
+      const SNAP_THRESHOLD = 10; // pixels
+      if (Math.abs(newY) < SNAP_THRESHOLD) { // if close to vertical center (0 offset)
+        newY = 0; // Snap to center
+      }
+
+      setImgOffset({
+        x: e.clientX - dragStart.current.x,
+        y: newY
+      });
+    }
   };
 
-  const stopDragImage = () => setIsDraggingImg(false);
+  const stopDragImage = () => {
+    setIsDraggingImg(false);
+    setIsPanningView(false);
+  };
+
+  const handleZoom = (e) => {
+    e.preventDefault();
+    const zoomSpeed = 0.1;
+    let newZoom = imgZoom;
+
+    if (e.deltaY < 0) { // Zoom in
+      newZoom += zoomSpeed;
+    } else { // Zoom out
+      newZoom -= zoomSpeed;
+    }
+
+    // Clamp zoom level
+    newZoom = Math.max(0.5, Math.min(newZoom, 5)); 
+    setImgZoom(newZoom);
+  };
 
   const handleSave = () => {
     if (!name) return alert("Please name your creation");
@@ -162,7 +218,7 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
       color: type === 'item' ? color : undefined,
       type,
       image,
-      imageConfig: image ? { x: imgOffset.x, y: imgOffset.y, scale: imgScale } : null
+      imageConfig: image ? { x: imgOffset.x, y: imgOffset.y, scale: imgScale, panOffset: imgPanOffset, zoom: imgZoom } : null
     });
     onClose();
   };
@@ -180,7 +236,7 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
             {initialData ? 'Edit' : 'Create New'} {type === 'item' ? 'Item' : 'Container'}
             </h2>
             
-            {type === 'item' && image && (
+            {image && ( // Changed from type === 'item' && image
                 <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700">
                     <button 
                         onClick={() => setMode('grid')}
@@ -236,18 +292,20 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
                         style={{
                             left: '50%',
                             top: '50%',
-                            transform: `translate(-50%, -50%) translate(${imgOffset.x}px, ${imgOffset.y}px)`,
+                            transform: `translate(-50%, -50%) translate(${imgOffset.x}px, ${imgOffset.y}px)`, // imgOffset for grid alignment
                         }}
-                        onMouseDown={startDragImage}
+                        onMouseDown={startDragImage} // for drag to position
+                        onWheel={handleZoom} // for zoom
                     >
                         <img 
                             src={image} 
                             alt="Item Asset" 
                             draggable={false}
                             style={{ 
-                                width: `${imgScale}px`, 
+                                width: `${imgScale * imgZoom}px`, // Apply zoom to image width
                                 maxWidth: 'none',
-                                opacity: mode === 'grid' ? 0.5 : 1
+                                opacity: mode === 'grid' ? 0.5 : 1,
+                                transform: `translate(${imgPanOffset.x}px, ${imgPanOffset.y}px)` // Apply pan
                             }}
                         />
                         {mode === 'image' && (
@@ -295,7 +353,7 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
                 </div>
                 )}
 
-                {type === 'item' && (
+                {(type === 'item' || type === 'container') && (
                     <div className="pt-4 border-t border-slate-700">
                         <label className="text-xs font-bold text-slate-400 flex items-center gap-2 mb-2"><ImageIcon size={14}/> Image Asset</label>
                         
@@ -346,21 +404,24 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
 // --- Main Application ---
 
 export default function App() {
-  const [itemDefs, setItemDefs] = useState([
+  const [itemDefs, setItemDefs] = useState(() => loadFromLocalStorage('gridForge_itemDefs', [
     { id: 'i1', name: 'Long Sword', type: 'item', color: '#ef4444', shape: [[1], [1], [1]] },
     { id: 'i2', name: 'Shield', type: 'item', color: '#3b82f6', shape: [[1, 1], [1, 1]] },
     { id: 'i3', name: 'Potion', type: 'item', color: '#ec4899', shape: [[1]] },
-  ]);
+  ]));
 
-  const [containerDefs, setContainerDefs] = useState([
+  const [containerDefs, setContainerDefs] = useState(() => loadFromLocalStorage('gridForge_containerDefs', [
     { id: 'c1', name: 'Backpack', type: 'container', shape: Array(6).fill(Array(8).fill(1)) },
-  ]);
+  ]));
 
-  const [activeContainers, setActiveContainers] = useState([]);
+  const [activeContainers, setActiveContainers] = useState(() => loadFromLocalStorage('gridForge_activeContainers', [
+    { instanceId: 'ac1', defId: 'c1', items: [] } // Default if nothing in localStorage
+  ]));
   const [dragState, setDragState] = useState(null); 
   const [hoverTarget, setHoverTarget] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [editorOpen, setEditorOpen] = useState(null); 
+  const [searchTerm, setSearchTerm] = useState(''); // New state for search functionality
   
   const [sortConfig, setSortConfig] = useState(() => {
     try {
@@ -402,10 +463,16 @@ export default function App() {
   }, [sortConfig]);
 
   useEffect(() => {
-    setActiveContainers([
-      { instanceId: 'ac1', defId: 'c1', items: [] }
-    ]);
-  }, []);
+    localStorage.setItem('gridForge_itemDefs', JSON.stringify(itemDefs));
+  }, [itemDefs]);
+
+  useEffect(() => {
+    localStorage.setItem('gridForge_containerDefs', JSON.stringify(containerDefs));
+  }, [containerDefs]);
+
+  useEffect(() => {
+    localStorage.setItem('gridForge_activeContainers', JSON.stringify(activeContainers));
+  }, [activeContainers]);
 
   const deleteItemDef = (id) => {
     if(!window.confirm("Delete this item? It will be removed from all containers.")) return;
@@ -750,6 +817,25 @@ export default function App() {
             className="relative"
             data-drop-container-id={containerInstance.instanceId}
         >
+          {/* Container Image Background */}
+          {containerDef.image && containerDef.imageConfig && (
+            <div 
+              className="absolute inset-0 z-0 overflow-hidden"
+            >
+              <img 
+                src={containerDef.image} 
+                alt={`${containerDef.name} background`}
+                className="absolute"
+                style={{
+                  width: `${containerDef.imageConfig.scale * (scale / 30)}px`, // scale original image scale by ratio
+                  left: '50%',
+                  top: '50%',
+                  transform: `translate(-50%, -50%) translate(${containerDef.imageConfig.x * (scale / 30)}px, ${containerDef.imageConfig.y * (scale / 30)}px)`,
+                  zIndex: 0 // Ensure it's behind the grid cells
+                }}
+              />
+            </div>
+          )}
           {containerDef.shape.map((row, y) => (
             row.map((cell, x) => {
               const isGhost = ghostCells.some(g => g.x === x && g.y === y);
@@ -757,15 +843,15 @@ export default function App() {
               return (
                 <div 
                   key={`cell-${x}-${y}`}
-                  className={`
-                    rounded transition-colors duration-75
-                    ${cell === 0 ? (isGhost ? 'opacity-100' : 'opacity-0') : 'bg-slate-800 border border-slate-700/50'}
-                    ${isGhost 
-                        ? (isValidPlacement ? 'bg-emerald-500/50 border-emerald-400' : 'bg-red-500/50 border-red-400') 
-                        : (dragState && cell === 1 ? 'hover:bg-slate-700 hover:border-slate-500' : '')
-                    }
-                  `}
-                  style={{ width: scale, height: scale }}
+                                    className={`
+                                      rounded transition-colors duration-75
+                                      ${isGhost
+                                          ? `opacity-100 ${isValidPlacement ? 'bg-emerald-500/50 border-emerald-400' : 'bg-red-500/50 border-red-400'}`
+                                          : cell === 1
+                                              ? `bg-slate-800 border border-slate-700/50 ${dragState ? 'hover:bg-slate-700 hover:border-slate-500' : ''}`
+                                              : 'opacity-0'
+                                      }
+                                    `}                  style={{ width: scale, height: scale }}
                 />
               );
             })
@@ -975,11 +1061,26 @@ export default function App() {
     reader.onload = (event) => {
         try {
             const data = JSON.parse(event.target.result);
-            if(data.itemDefs) setItemDefs(data.itemDefs);
-            if(data.containerDefs) setContainerDefs(data.containerDefs);
-            if(data.activeContainers) setActiveContainers(data.activeContainers);
-            if(data.sortConfig) setSortConfig(data.sortConfig);
-            if(data.visualSettings) setVisualSettings(data.visualSettings);
+            if(data.itemDefs) {
+              setItemDefs(data.itemDefs);
+              localStorage.setItem('gridForge_itemDefs', JSON.stringify(data.itemDefs));
+            }
+            if(data.containerDefs) {
+              setContainerDefs(data.containerDefs);
+              localStorage.setItem('gridForge_containerDefs', JSON.stringify(data.containerDefs));
+            }
+            if(data.activeContainers) {
+              setActiveContainers(data.activeContainers);
+              localStorage.setItem('gridForge_activeContainers', JSON.stringify(data.activeContainers));
+            }
+            if(data.sortConfig) {
+              setSortConfig(data.sortConfig);
+              localStorage.setItem('gridForge_sortConfig', JSON.stringify(data.sortConfig));
+            }
+            if(data.visualSettings) {
+              setVisualSettings(data.visualSettings);
+              localStorage.setItem('gridForge_visualSettings', JSON.stringify(data.visualSettings));
+            }
         } catch (err) {
             alert("Invalid save file");
         }
@@ -1104,7 +1205,7 @@ export default function App() {
                                     <input 
                                         type="color" 
                                         value={visualSettings.imageFillColor} 
-                                        onChange={e => setVisualSettings({...visualSettings, imageFillColor: e.target.value})}
+                                        onChange={e => setVisualSettings({...visualSettings, color: e.target.value})}
                                         className="w-5 h-5 rounded cursor-pointer border-none bg-transparent"
                                     />
                                 </div>
@@ -1150,14 +1251,23 @@ export default function App() {
 
             <div>
                 <h3 className="text-xs font-bold uppercase text-slate-400 mb-3 tracking-wider">Containers</h3>
+                <input 
+                  type="text" 
+                  placeholder="Search containers..." 
+                  className="w-full bg-slate-900 text-white p-2 rounded border border-slate-700 focus:border-indigo-500 outline-none text-sm mb-4"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
                 <div className="grid grid-cols-2 gap-3">
-                    {containerDefs.map(def => (
+                    {containerDefs
+                        .filter(def => def.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                        .map(def => (
                         <div key={def.id} className="relative group">
                           <button 
                               onClick={() => setActiveContainers([...activeContainers, { instanceId: generateId(), defId: def.id, items: [] }])}
-                              className="w-full p-3 bg-slate-800 border border-slate-700 hover:border-indigo-500 hover:bg-slate-750 rounded-lg text-center transition-all active:scale-95 group flex flex-col items-center justify-center h-24"
+                              className="w-full p-2 bg-slate-800 border border-slate-700 hover:border-indigo-500 hover:bg-slate-750 rounded-lg text-center transition-all active:scale-95 group flex flex-col items-center justify-center h-16"
                           >
-                              <Grid3X3 className="mb-2 text-slate-500 group-hover:text-indigo-400 transition-colors" size={24}/>
+                              <Grid3X3 className="mb-1 text-slate-500 group-hover:text-indigo-400 transition-colors" size={18}/>
                               <span className="text-xs font-medium block truncate w-full text-slate-400 group-hover:text-slate-200">{def.name}</span>
                           </button>
                           <div className="absolute -top-1 -right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1183,12 +1293,21 @@ export default function App() {
 
             <div>
                 <h3 className="text-xs font-bold uppercase text-slate-400 mb-3 tracking-wider">Items</h3>
-                <div className="space-y-3 pb-8">
-                    {itemDefs.map(def => (
+                <input 
+                  type="text" 
+                  placeholder="Search items..." 
+                  className="w-full bg-slate-900 text-white p-2 rounded border border-slate-700 focus:border-indigo-500 outline-none text-sm mb-4"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <div className="grid grid-cols-2 gap-3 pb-8">
+                    {itemDefs
+                        .filter(def => def.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                        .map(def => (
                         <div 
                             key={def.id}
                             onMouseDown={(e) => handleMouseDown(e, { id: def.id, shape: def.shape, currentShape: def.shape, x: 0, y: 0 }, null, true)}
-                            className="p-4 bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-xl cursor-grab active:cursor-grabbing group relative overflow-hidden transition-all hover:bg-slate-750"
+                            className="p-3 bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-xl cursor-grab active:cursor-grabbing group relative overflow-hidden transition-all hover:bg-slate-750"
                         >
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-xs font-bold text-slate-300 group-hover:text-white transition-colors">{def.name}</span>
@@ -1214,11 +1333,11 @@ export default function App() {
                               </div>
                             </div>
                             
-                            <div className="flex justify-center items-center py-2 bg-slate-900/50 rounded-lg group-hover:bg-slate-900 transition-colors overflow-hidden relative min-h-[40px]">
+                            <div className="flex justify-center items-center py-2 bg-slate-900/50 rounded-lg group-hover:bg-slate-900 transition-colors overflow-hidden relative min-h-[30px]">
                                 {def.image ? (
-                                    <div className="w-full h-10 relative overflow-hidden">
+                                    <div className="w-full h-8 relative overflow-hidden">
                                         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-                                            <img src={def.image} alt="preview" className="h-10 w-auto object-contain opacity-80 group-hover:opacity-100 transition-opacity" />
+                                            <img src={def.image} alt="preview" className="h-8 w-auto object-contain opacity-80 group-hover:opacity-100 transition-opacity" />
                                         </div>
                                     </div>
                                 ) : (
