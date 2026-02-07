@@ -1,0 +1,1313 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { 
+  Save, Upload, Plus, 
+  Trash2, Grid3X3, Box, Settings, LayoutGrid,
+  FlipHorizontal, Sliders, Eye, Image as ImageIcon, Move,
+  Pencil, Lock, MousePointer2, PaintBucket
+} from 'lucide-react';
+
+// --- Constants ---
+const GAP = 2;
+
+// --- Helper Functions ---
+
+const generateId = () => Math.random().toString(36).substr(2, 9);
+
+const hexToRgba = (hex, alpha) => {
+    let c;
+    if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
+        c= hex.substring(1).split('');
+        if(c.length== 3){
+            c= [c[0], c[0], c[1], c[1], c[2], c[2]];
+        }
+        c= '0x'+c.join('');
+        return 'rgba('+[(c>>16)&255, (c>>8)&255, c&255].join(',')+','+alpha+')';
+    }
+    return hex;
+}
+
+const rotateMatrix = (matrix) => {
+  if (!matrix || matrix.length === 0) return [];
+  const rows = matrix.length;
+  const cols = matrix[0].length;
+  const newMatrix = Array.from({ length: cols }, () => Array(rows).fill(0));
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      newMatrix[x][rows - 1 - y] = matrix[y][x];
+    }
+  }
+  return newMatrix;
+};
+
+const rotateMatrixCCW = (matrix) => {
+  return rotateMatrix(rotateMatrix(rotateMatrix(matrix)));
+};
+
+const flipMatrix = (matrix) => {
+  return matrix.map(row => [...row].reverse());
+};
+
+const getItemOccupiedCells = (shapeMatrix, startX, startY) => {
+  const cells = [];
+  shapeMatrix.forEach((row, y) => {
+    row.forEach((cell, x) => {
+      if (cell === 1) {
+        cells.push({ x: startX + x, y: startY + y });
+      }
+    });
+  });
+  return cells;
+};
+
+const canPlaceItem = (container, itemShape, x, y, excludeInstanceId = null) => {
+  const itemCells = getItemOccupiedCells(itemShape, x, y);
+  for (let cell of itemCells) {
+    if (
+      cell.y < 0 || 
+      cell.y >= container.shape.length || 
+      cell.x < 0 || 
+      cell.x >= container.shape[0].length ||
+      container.shape[cell.y][cell.x] === 0 
+    ) {
+      return false;
+    }
+  }
+  for (let instance of container.items) {
+    if (instance.id === excludeInstanceId) continue;
+    const otherCells = getItemOccupiedCells(instance.currentShape, instance.x, instance.y);
+    const hasOverlap = itemCells.some(ic => 
+      otherCells.some(oc => oc.x === ic.x && oc.y === ic.y)
+    );
+    if (hasOverlap) return false;
+  }
+  return true;
+};
+
+// Calculate the center cell of a shape (for mouse anchoring)
+const getCenterCellOffset = (shape) => {
+  const centerCol = Math.floor(shape[0].length / 2);
+  const centerRow = Math.floor(shape.length / 2);
+  return { x: centerCol, y: centerRow };
+};
+
+// --- Components ---
+
+const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => {
+  const [width, setWidth] = useState(initialData?.shape?.[0]?.length || 4);
+  const [height, setHeight] = useState(initialData?.shape?.length || 4);
+  const [matrix, setMatrix] = useState(initialData?.shape || Array(4).fill(Array(4).fill(1)));
+  const [name, setName] = useState(initialData?.name || '');
+  const [color, setColor] = useState(initialData?.color || '#6366f1');
+  
+  // Image State
+  const [image, setImage] = useState(initialData?.image || null);
+  const [imgOffset, setImgOffset] = useState(initialData?.imageConfig ? { x: initialData.imageConfig.x, y: initialData.imageConfig.y } : { x: 0, y: 0 });
+  const [imgScale, setImgScale] = useState(initialData?.imageConfig?.scale || 100);
+  const [isDraggingImg, setIsDraggingImg] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+
+  const [mode, setMode] = useState('grid'); 
+
+  // Editor constants
+  const EDITOR_CELL = 30;
+  const EDITOR_GAP = 4;
+
+  useEffect(() => {
+    if(initialData && width === initialData.shape[0].length && height === initialData.shape.length) return;
+    setMatrix(Array(height).fill(null).map(() => Array(width).fill(type === 'item' ? 0 : 1)));
+  }, [width, height, type]);
+
+  const toggleCell = (r, c) => {
+    if (mode !== 'grid') return;
+    const newM = matrix.map(row => [...row]);
+    newM[r][c] = newM[r][c] === 1 ? 0 : 1;
+    setMatrix(newM);
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+          setImage(e.target.result);
+          setMode('image');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const startDragImage = (e) => {
+    if (mode !== 'image') return;
+    e.preventDefault();
+    setIsDraggingImg(true);
+    dragStart.current = { x: e.clientX - imgOffset.x, y: e.clientY - imgOffset.y };
+  };
+
+  const onDragImage = (e) => {
+    if (!isDraggingImg) return;
+    setImgOffset({
+      x: e.clientX - dragStart.current.x,
+      y: e.clientY - dragStart.current.y
+    });
+  };
+
+  const stopDragImage = () => setIsDraggingImg(false);
+
+  const handleSave = () => {
+    if (!name) return alert("Please name your creation");
+    onSave({
+      id: initialData?.id || generateId(),
+      name,
+      shape: matrix,
+      color: type === 'item' ? color : undefined,
+      type,
+      image,
+      imageConfig: image ? { x: imgOffset.x, y: imgOffset.y, scale: imgScale } : null
+    });
+    onClose();
+  };
+
+  return (
+    <div 
+        className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm"
+        onMouseMove={onDragImage}
+        onMouseUp={stopDragImage}
+        onMouseLeave={stopDragImage}
+    >
+      <div className="bg-slate-800 p-6 rounded-xl border border-slate-600 shadow-2xl w-[700px] max-h-[90vh] overflow-y-auto flex flex-col">
+        <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-white">
+            {initialData ? 'Edit' : 'Create New'} {type === 'item' ? 'Item' : 'Container'}
+            </h2>
+            
+            {type === 'item' && image && (
+                <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700">
+                    <button 
+                        onClick={() => setMode('grid')}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${mode === 'grid' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                    >
+                        <Grid3X3 size={14}/> Edit Grid
+                    </button>
+                    <button 
+                        onClick={() => setMode('image')}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${mode === 'image' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                    >
+                        <Move size={14}/> Move Image
+                    </button>
+                </div>
+            )}
+        </div>
+        
+        <div className="flex gap-6 mb-6">
+            <div className="flex-1 bg-slate-900/50 p-8 rounded border border-slate-700/50 overflow-hidden select-none flex justify-center items-center relative min-h-[300px]">
+                {/* Hitbox border visualization */}
+                <div 
+                    className="absolute border-2 border-dashed border-slate-600/30 pointer-events-none"
+                    style={{
+                        width: width * EDITOR_CELL + Math.max(0, width - 1) * EDITOR_GAP,
+                        height: height * EDITOR_CELL + Math.max(0, height - 1) * EDITOR_GAP
+                    }}
+                />
+
+                <div 
+                    className={`relative z-10 grid ${mode === 'image' ? 'pointer-events-none opacity-50' : ''}`} 
+                    style={{ 
+                        gridTemplateColumns: `repeat(${width}, ${EDITOR_CELL}px)`,
+                        gap: `${EDITOR_GAP}px`
+                    }}
+                >
+                    {matrix.map((row, r) => row.map((cell, c) => (
+                    <div 
+                        key={`${r}-${c}`}
+                        onClick={() => toggleCell(r, c)}
+                        className={`w-[30px] h-[30px] border border-slate-600/50 cursor-pointer rounded-sm hover:ring-2 ring-white/50 transition-all z-20 ${
+                        cell === 1 
+                            ? (type === 'item' ? 'bg-indigo-500/50' : 'bg-slate-200/50') 
+                            : 'bg-transparent'
+                        }`}
+                    />
+                    )))
+                    }
+                </div>
+
+                {image && (
+                    <div 
+                        className={`absolute z-0 ${mode === 'image' ? 'cursor-move' : 'pointer-events-none'}`}
+                        style={{
+                            left: '50%',
+                            top: '50%',
+                            transform: `translate(-50%, -50%) translate(${imgOffset.x}px, ${imgOffset.y}px)`,
+                        }}
+                        onMouseDown={startDragImage}
+                    >
+                        <img 
+                            src={image} 
+                            alt="Item Asset" 
+                            draggable={false}
+                            style={{ 
+                                width: `${imgScale}px`, 
+                                maxWidth: 'none',
+                                opacity: mode === 'grid' ? 0.5 : 1
+                            }}
+                        />
+                        {mode === 'image' && (
+                            <div className="absolute inset-0 border border-indigo-400 opacity-50 pointer-events-none"></div>
+                        )}
+                    </div>
+                )}
+                
+                <div className="absolute inset-0 pointer-events-none opacity-10" style={{backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '10px 10px'}}></div>
+            </div>
+
+            <div className="w-64 space-y-5">
+                <div>
+                    <label className="text-xs text-slate-400 block mb-1">Dimensions</label>
+                    <div className="flex gap-2">
+                        <div className="relative flex-1">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">W</span>
+                            <input type="number" value={width} onChange={e => setWidth(Number(e.target.value))} className="w-full bg-slate-900 text-white pl-6 pr-2 py-1.5 rounded border border-slate-700 focus:border-indigo-500 outline-none text-sm" min="1" max="10"/>
+                        </div>
+                        <div className="relative flex-1">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">H</span>
+                            <input type="number" value={height} onChange={e => setHeight(Number(e.target.value))} className="w-full bg-slate-900 text-white pl-6 pr-2 py-1.5 rounded border border-slate-700 focus:border-indigo-500 outline-none text-sm" min="1" max="10"/>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label className="text-xs text-slate-400 block mb-1">Name</label>
+                    <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-slate-900 text-white p-2 rounded border border-slate-700 focus:border-indigo-500 outline-none text-sm" placeholder="Ex: Health Potion"/>
+                </div>
+
+                {type === 'item' && (
+                <div>
+                    <label className="text-xs text-slate-400 block mb-1">Color</label>
+                    <div className="flex gap-1.5 flex-wrap">
+                    {['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#6366f1', '#a855f7', '#ec4899', '#94a3b8'].map(c => (
+                        <button 
+                        key={c}
+                        onClick={() => setColor(c)}
+                        className={`w-5 h-5 rounded-full transition-transform hover:scale-110 ${color === c ? 'ring-2 ring-white scale-110' : ''}`}
+                        style={{ backgroundColor: c }}
+                        />
+                    ))}
+                    </div>
+                </div>
+                )}
+
+                {type === 'item' && (
+                    <div className="pt-4 border-t border-slate-700">
+                        <label className="text-xs font-bold text-slate-400 flex items-center gap-2 mb-2"><ImageIcon size={14}/> Image Asset</label>
+                        
+                        {!image ? (
+                            <label className="flex flex-col items-center justify-center h-20 border-2 border-dashed border-slate-700 rounded hover:border-indigo-500 hover:bg-slate-800 transition-colors cursor-pointer text-slate-500 text-[10px]">
+                                <Upload size={16} className="mb-1"/>
+                                <span>Click to Upload</span>
+                                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                            </label>
+                        ) : (
+                            <div className="space-y-3">
+                                <div>
+                                    <div className="flex justify-between text-xs text-slate-500 mb-1">
+                                        <span>Scale</span>
+                                        <span>{imgScale}px</span>
+                                    </div>
+                                    <input 
+                                        type="range" min="20" max="400" 
+                                        value={imgScale} 
+                                        onChange={e => setImgScale(Number(e.target.value))}
+                                        className="w-full accent-indigo-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                                        disabled={mode !== 'image'}
+                                    />
+                                </div>
+                                <div className="flex gap-2">
+                                    <label className="flex-1 text-center py-1.5 bg-slate-800 border border-slate-700 rounded cursor-pointer hover:bg-slate-700 text-[10px] text-slate-300">
+                                        Change
+                                        <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                                    </label>
+                                    <button onClick={() => setImage(null)} className="p-1.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded hover:bg-red-500/20"><Trash2 size={14}/></button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-4 border-t border-slate-700 mt-auto">
+          <button onClick={onClose} className="px-4 py-2 text-slate-300 hover:bg-slate-700 rounded transition-colors">Cancel</button>
+          <button onClick={handleSave} className="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-500 rounded font-bold transition-colors shadow-lg shadow-indigo-500/20">Save Asset</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Main Application ---
+
+export default function App() {
+  const [itemDefs, setItemDefs] = useState([
+    { id: 'i1', name: 'Long Sword', type: 'item', color: '#ef4444', shape: [[1], [1], [1]] },
+    { id: 'i2', name: 'Shield', type: 'item', color: '#3b82f6', shape: [[1, 1], [1, 1]] },
+    { id: 'i3', name: 'Potion', type: 'item', color: '#ec4899', shape: [[1]] },
+  ]);
+
+  const [containerDefs, setContainerDefs] = useState([
+    { id: 'c1', name: 'Backpack', type: 'container', shape: Array(6).fill(Array(8).fill(1)) },
+  ]);
+
+  const [activeContainers, setActiveContainers] = useState([]);
+  const [dragState, setDragState] = useState(null); 
+  const [hoverTarget, setHoverTarget] = useState(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [editorOpen, setEditorOpen] = useState(null); 
+  
+  const [sortConfig, setSortConfig] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gridForge_sortConfig');
+      return saved ? JSON.parse(saved) : {
+        allowRotate: true,
+        allowFlip: true,
+        startCorner: 'TL'
+      };
+    } catch (e) {
+      return { allowRotate: true, allowFlip: true, startCorner: 'TL' };
+    }
+  });
+
+  const [visualSettings, setVisualSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gridForge_visualSettings');
+      const defaults = {
+        thickness: 2,
+        color: '#000000',
+        opacity: 0.5,
+        gridScale: 40,
+        imageFillColor: '#6366f1',
+        imageFillOpacity: 0.0 // Default off
+      };
+      return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+    } catch (e) {
+      return { thickness: 2, color: '#000000', opacity: 0.5, gridScale: 40, imageFillColor: '#6366f1', imageFillOpacity: 0.0 };
+    }
+  });
+
+  // Auto-save settings
+  useEffect(() => {
+    localStorage.setItem('gridForge_visualSettings', JSON.stringify(visualSettings));
+  }, [visualSettings]);
+
+  useEffect(() => {
+    localStorage.setItem('gridForge_sortConfig', JSON.stringify(sortConfig));
+  }, [sortConfig]);
+
+  useEffect(() => {
+    setActiveContainers([
+      { instanceId: 'ac1', defId: 'c1', items: [] }
+    ]);
+  }, []);
+
+  const deleteItemDef = (id) => {
+    if(!window.confirm("Delete this item? It will be removed from all containers.")) return;
+    setItemDefs(prev => prev.filter(i => i.id !== id));
+    setActiveContainers(prev => prev.map(c => ({
+      ...c,
+      items: c.items.filter(i => i.defId !== id)
+    })));
+  };
+
+  const deleteContainerDef = (id) => {
+    if(!window.confirm("Delete this container layout? All active containers of this type will be removed.")) return;
+    setContainerDefs(prev => prev.filter(c => c.id !== id));
+    setActiveContainers(prev => prev.filter(c => c.defId !== id));
+  };
+
+  const handleEditItem = (def) => {
+      setEditorOpen({ type: 'item', initialData: def });
+  };
+
+  const handleEditContainer = (def) => {
+      setEditorOpen({ type: 'container', initialData: def });
+  };
+
+  const handleSaveEditor = (newItem) => {
+      if (newItem.type === 'item') {
+          const exists = itemDefs.find(i => i.id === newItem.id);
+          if (exists) {
+              setItemDefs(itemDefs.map(i => i.id === newItem.id ? newItem : i));
+          } else {
+              setItemDefs([...itemDefs, newItem]);
+          }
+      } else {
+          const exists = containerDefs.find(c => c.id === newItem.id);
+          if (exists) {
+              setContainerDefs(containerDefs.map(c => c.id === newItem.id ? newItem : c));
+          } else {
+              setContainerDefs([...containerDefs, newItem]);
+          }
+      }
+  };
+
+  const handleMouseDown = (e, itemInstance, containerId, isPaletteItem = false) => {
+    if (e.target.closest('button')) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const item = isPaletteItem 
+      ? { ...itemInstance, instanceId: generateId(), currentShape: itemInstance.shape, rotation: 0, defId: itemInstance.id }
+      : itemInstance;
+
+    // Use null offsets to signal center-based dragging
+    setDragState({
+      item,
+      sourceContainerId: containerId,
+      originalX: isPaletteItem ? -1 : item.x,
+      originalY: isPaletteItem ? -1 : item.y,
+      offsetX: 0, // Ignored in center mode logic
+      offsetY: 0,
+      isPalette: isPaletteItem
+    });
+
+    if (!isPaletteItem) {
+      setActiveContainers(prev => prev.map(c => {
+        if (c.instanceId === containerId) {
+          return { ...c, items: c.items.filter(i => i.instanceId !== item.instanceId) };
+        }
+        return c;
+      }));
+    }
+  };
+
+  const handleMouseMove = useCallback((e) => {
+    setMousePos({ x: e.clientX, y: e.clientY });
+
+    if (dragState) {
+        // Find container under cursor
+        const elements = document.elementsFromPoint(e.clientX, e.clientY);
+        const containerEl = elements.find(el => el.hasAttribute('data-drop-container-id'));
+
+        if (containerEl) {
+            const containerId = containerEl.getAttribute('data-drop-container-id');
+            const rect = containerEl.getBoundingClientRect();
+            const relX = e.clientX - rect.left;
+            const relY = e.clientY - rect.top;
+            
+            // Calculate grid coords
+            const rawX = Math.floor(relX / (visualSettings.gridScale + GAP));
+            const rawY = Math.floor(relY / (visualSettings.gridScale + GAP));
+
+            setHoverTarget(prev => {
+                if (prev && prev.containerId === containerId && prev.x === rawX && prev.y === rawY) return prev;
+                return { containerId, x: rawX, y: rawY };
+            });
+        } else {
+            setHoverTarget(null);
+        }
+    }
+  }, [dragState, visualSettings.gridScale]);
+
+  const handleRotation = useCallback((direction) => {
+    if (!dragState) return;
+    
+    setDragState(prev => {
+      const newShape = direction === 'cw' 
+        ? rotateMatrix(prev.item.currentShape) 
+        : rotateMatrixCCW(prev.item.currentShape);
+      
+      const newRotation = (prev.item.rotation + (direction === 'cw' ? 1 : 3)) % 4;
+
+      return {
+        ...prev,
+        item: {
+          ...prev.item,
+          currentShape: newShape,
+          rotation: newRotation
+        }
+      };
+    });
+  }, [dragState]);
+
+  const handleFlip = useCallback(() => {
+    if (!dragState) return;
+    
+    setDragState(prev => {
+      const newShape = flipMatrix(prev.item.currentShape);
+      return {
+        ...prev,
+        item: {
+          ...prev.item,
+          currentShape: newShape
+        }
+      };
+    });
+  }, [dragState]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const key = e.key.toLowerCase();
+      if (key === 'e') handleRotation('cw');
+      if (key === 'q') handleRotation('ccw');
+      if (key === 'w') handleFlip();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, [handleRotation, handleFlip, handleMouseMove]);
+
+  const handleMouseUp = (e) => {
+    if (!dragState) return;
+
+    let placed = false;
+
+    if (hoverTarget) {
+      const { containerId, x: mouseGridX, y: mouseGridY } = hoverTarget;
+      
+      const containerIndex = activeContainers.findIndex(c => c.instanceId === containerId);
+      if (containerIndex !== -1) {
+        const container = activeContainers[containerIndex];
+        const containerDef = containerDefs.find(d => d.id === container.defId);
+        
+        // Use center cell offset logic
+        const centerOffset = getCenterCellOffset(dragState.item.currentShape);
+        const targetX = mouseGridX - centerOffset.x;
+        const targetY = mouseGridY - centerOffset.y;
+
+        const containerObj = { ...container, shape: containerDef.shape };
+
+        if (canPlaceItem(containerObj, dragState.item.currentShape, targetX, targetY)) {
+          const newItem = { ...dragState.item, x: targetX, y: targetY };
+          
+          setActiveContainers(prev => {
+            const next = [...prev];
+            next[containerIndex] = {
+              ...container,
+              items: [...container.items, newItem]
+            };
+            return next;
+          });
+          placed = true;
+        }
+      }
+    }
+
+    if (!placed && !dragState.isPalette) {
+      setActiveContainers(prev => prev.map(c => {
+        if (c.instanceId === dragState.sourceContainerId) {
+          return {
+            ...c,
+            items: [...c.items, { 
+              ...dragState.item, 
+              x: dragState.originalX, 
+              y: dragState.originalY 
+            }]
+          };
+        }
+        return c;
+      }));
+    }
+
+    setDragState(null);
+    setHoverTarget(null);
+  };
+
+  const autoSort = (containerInstanceId) => {
+    const containerIdx = activeContainers.findIndex(c => c.instanceId === containerInstanceId);
+    if (containerIdx === -1) return;
+
+    const container = activeContainers[containerIdx];
+    const containerDef = containerDefs.find(d => d.id === container.defId);
+    
+    let itemsToSort = [...container.items];
+    itemsToSort.sort((a, b) => {
+      const sizeA = a.currentShape.flat().filter(x => x === 1).length;
+      const sizeB = b.currentShape.flat().filter(x => x === 1).length;
+      return sizeB - sizeA;
+    });
+
+    const newItems = [];
+    const occupiedMap = containerDef.shape.map(row => [...row].fill(0)); 
+
+    const tryPlace = (item, x, y, shape) => {
+      const itemCells = getItemOccupiedCells(shape, x, y);
+      for (let cell of itemCells) {
+        if (
+          cell.y < 0 || cell.y >= containerDef.shape.length ||
+          cell.x < 0 || cell.x >= containerDef.shape[0].length ||
+          containerDef.shape[cell.y][cell.x] === 0 || 
+          occupiedMap[cell.y][cell.x] === 1 
+        ) return false;
+      }
+      return true;
+    };
+
+    const markMap = (x, y, shape) => {
+      const itemCells = getItemOccupiedCells(shape, x, y);
+      itemCells.forEach(cell => {
+        occupiedMap[cell.y][cell.x] = 1;
+      });
+    };
+
+    const rows = containerDef.shape.length;
+    const cols = containerDef.shape[0].length;
+    let coords = [];
+    for(let y=0; y<rows; y++) {
+      for(let x=0; x<cols; x++) {
+        coords.push({x, y});
+      }
+    }
+
+    if (sortConfig.startCorner === 'TR') {
+      coords.sort((a, b) => (a.y - b.y) || (b.x - a.x));
+    } else if (sortConfig.startCorner === 'BL') {
+      coords.sort((a, b) => (b.y - a.y) || (a.x - b.x));
+    } else if (sortConfig.startCorner === 'BR') {
+      coords.sort((a, b) => (b.y - a.y) || (b.x - a.x));
+    }
+
+    const flips = sortConfig.allowFlip ? [false, true] : [false];
+    const rotations = sortConfig.allowRotate ? [0, 1, 2, 3] : [0];
+
+    for (let item of itemsToSort) {
+      let placed = false;
+      
+      const def = itemDefs.find(d => d.id === item.defId);
+      if(!def) continue; 
+
+      for (let f of flips) {
+          if (placed) break;
+          for (let r of rotations) {
+            if (placed) break;
+
+            let testShape = def.shape;
+            if (f) testShape = flipMatrix(testShape);
+            for(let i=0; i<r; i++) testShape = rotateMatrix(testShape);
+
+            for (let coord of coords) {
+              if (tryPlace(item, coord.x, coord.y, testShape)) {
+                newItems.push({ ...item, x: coord.x, y: coord.y, currentShape: testShape, rotation: r });
+                markMap(coord.x, coord.y, testShape);
+                placed = true;
+                break;
+              }
+            }
+        }
+      }
+    }
+
+    setActiveContainers(prev => {
+      const next = [...prev];
+      next[containerIdx] = { ...container, items: newItems };
+      return next;
+    });
+  };
+
+  const renderGrid = (containerInstance, containerDef) => {
+    const scale = visualSettings.gridScale;
+    const gridStyle = {
+      display: 'grid',
+      gridTemplateColumns: `repeat(${containerDef.shape[0].length}, ${scale}px)`,
+      gap: `${GAP}px`
+    };
+
+    let ghostCells = [];
+    let isValidPlacement = false;
+
+    if (dragState && hoverTarget && hoverTarget.containerId === containerInstance.instanceId) {
+      const centerOffset = getCenterCellOffset(dragState.item.currentShape);
+      const targetX = hoverTarget.x - centerOffset.x;
+      const targetY = hoverTarget.y - centerOffset.y;
+
+      ghostCells = getItemOccupiedCells(dragState.item.currentShape, targetX, targetY);
+      isValidPlacement = canPlaceItem(
+        { ...containerInstance, shape: containerDef.shape }, 
+        dragState.item.currentShape, 
+        targetX, 
+        targetY
+      );
+    }
+
+    return (
+      <div 
+        onMouseLeave={() => setHoverTarget(null)}
+        className="relative bg-slate-900/50 p-3 rounded-xl border border-slate-700 shadow-inner inline-block backdrop-blur-sm"
+      >
+        <div className="flex justify-between items-center mb-3 text-slate-400 text-xs uppercase tracking-wider font-bold">
+            <span className="flex items-center gap-2"><Box size={14} className="text-indigo-400"/> {containerDef.name}</span>
+            <div className="flex gap-1 bg-slate-800 rounded p-0.5">
+                <button title="Auto Sort" onClick={() => autoSort(containerInstance.instanceId)} className="p-1 hover:bg-indigo-600 hover:text-white rounded transition-colors text-slate-400"><LayoutGrid size={14} /></button>
+                <div className="w-px bg-slate-700 mx-0.5"></div>
+                <button title="Delete Container" onClick={() => setActiveContainers(prev => prev.filter(c => c.instanceId !== containerInstance.instanceId))} className="p-1 hover:bg-red-500 hover:text-white rounded transition-colors text-slate-400"><Trash2 size={14} /></button>
+            </div>
+        </div>
+
+        {/* This div wraps the grid and carries the ID for hover detection */}
+        <div 
+            style={gridStyle} 
+            className="relative"
+            data-drop-container-id={containerInstance.instanceId}
+        >
+          {containerDef.shape.map((row, y) => (
+            row.map((cell, x) => {
+              const isGhost = ghostCells.some(g => g.x === x && g.y === y);
+              
+              return (
+                <div 
+                  key={`cell-${x}-${y}`}
+                  className={`
+                    rounded transition-colors duration-75
+                    ${cell === 0 ? (isGhost ? 'opacity-100' : 'opacity-0') : 'bg-slate-800 border border-slate-700/50'}
+                    ${isGhost 
+                        ? (isValidPlacement ? 'bg-emerald-500/50 border-emerald-400' : 'bg-red-500/50 border-red-400') 
+                        : (dragState && cell === 1 ? 'hover:bg-slate-700 hover:border-slate-500' : '')
+                    }
+                  `}
+                  style={{ width: scale, height: scale }}
+                />
+              );
+            })
+          ))}
+
+          {containerInstance.items.map(item => {
+             const top = item.y * (scale + GAP);
+             const left = item.x * (scale + GAP);
+             const width = item.currentShape[0].length * scale + (item.currentShape[0].length - 1) * GAP;
+             const height = item.currentShape.length * scale + (item.currentShape.length - 1) * GAP;
+
+             return (
+               <div
+                 key={item.instanceId}
+                 onMouseDown={(e) => handleMouseDown(e, item, containerInstance.instanceId)}
+                 className="absolute z-10 transition-filter pointer-events-none" 
+                 style={{ top, left, width, height }}
+               >
+                 <ItemVisual item={item} visualSettings={visualSettings} isInteractive={true} />
+               </div>
+             );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const ItemVisual = ({ item, visualSettings = { thickness: 3, color: '#000', opacity: 1, gridScale: 40, imageFillColor: '#6366f1', imageFillOpacity: 0.0 }, isInteractive = false }) => {
+    const def = itemDefs.find(d => d.id === item.defId);
+    if (!def) return null;
+    const shape = item.currentShape;
+    const borderColor = hexToRgba(visualSettings.color, visualSettings.opacity);
+    const borderStyle = `${visualSettings.thickness}px solid ${borderColor}`;
+
+    // --- Image Rendering Logic ---
+    const EDITOR_CELL_SIZE = 30; // Matches ShapeEditor cell size
+    const scaleRatio = visualSettings.gridScale / EDITOR_CELL_SIZE;
+
+    if (def.image && def.imageConfig) {
+        const rotationDeg = (item.rotation || 0) * 90;
+        
+        return (
+            <div className="w-full h-full relative group overflow-hidden">
+                 {/* Background Fill Layer (Behind Image) */}
+                 <div 
+                    className="absolute inset-0 z-0"
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${shape[0].length}, 1fr)`,
+                        gridTemplateRows: `repeat(${shape.length}, 1fr)`,
+                        gap: '0px'
+                    }}
+                 >
+                    {shape.map((row, y) => row.map((cell, x) => (
+                        cell === 1 ? <div key={`bg-${x}-${y}`} style={{backgroundColor: hexToRgba(visualSettings.imageFillColor, visualSettings.imageFillOpacity)}} /> : <div key={`bg-${x}-${y}`} />
+                    )))}
+                 </div>
+
+                 {/* Image Layer */}
+                 <div 
+                    className="absolute z-0 pointer-events-none"
+                    style={{
+                        left: '50%',
+                        top: '50%',
+                        width: '0px', height: '0px',
+                        transform: `rotate(${rotationDeg}deg)`
+                    }}
+                 >
+                     <div 
+                        className="absolute"
+                        style={{
+                            left: def.imageConfig.x * scaleRatio, 
+                            top: def.imageConfig.y * scaleRatio,
+                            width: def.imageConfig.scale * scaleRatio, 
+                            transform: 'translate(-50%, -50%)'
+                        }}
+                     >
+                         <img src={def.image} className="w-full h-auto block" draggable={false} />
+                     </div>
+                 </div>
+
+                 {/* Render Grid Borders on top of Image */}
+                 <div 
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${shape[0].length}, 1fr)`,
+                        gridTemplateRows: `repeat(${shape.length}, 1fr)`,
+                        gap: '0px',
+                        width: '100%',
+                        height: '100%',
+                        position: 'relative',
+                        zIndex: 10
+                    }}
+                 >
+                    {shape.map((row, y) => 
+                        row.map((cell, x) => {
+                        if (cell !== 1) return <div key={`${x}-${y}`} />;
+                        
+                        const hasTop = y > 0 && shape[y-1][x] === 1;
+                        const hasBottom = y < shape.length - 1 && shape[y+1][x] === 1;
+                        const hasLeft = x > 0 && shape[y][x-1] === 1;
+                        const hasRight = x < shape[0].length - 1 && shape[y][x+1] === 1;
+
+                        return (
+                            <div 
+                                key={`${x}-${y}`} 
+                                className={`w-full h-full ${isInteractive ? 'pointer-events-auto cursor-grab active:cursor-grabbing' : ''}`}
+                                style={{
+                                    borderTop: !hasTop ? borderStyle : 'none',
+                                    borderBottom: !hasBottom ? borderStyle : 'none',
+                                    borderLeft: !hasLeft ? borderStyle : 'none',
+                                    borderRight: !hasRight ? borderStyle : 'none',
+                                }}
+                            />
+                        );
+                        })
+                    )}
+                 </div>
+            </div>
+        );
+    }
+
+    // --- Standard Color Rendering ---
+    return (
+      <div className="w-full h-full relative overflow-hidden">
+        <div 
+           style={{
+             display: 'grid',
+             gridTemplateColumns: `repeat(${shape[0].length}, 1fr)`,
+             gridTemplateRows: `repeat(${shape.length}, 1fr)`,
+             gap: '0px', // Continuous look
+             width: '100%',
+             height: '100%'
+           }}
+        >
+          {shape.map((row, y) => 
+            row.map((cell, x) => {
+              if (cell !== 1) return <div key={`${x}-${y}`} className="opacity-0"></div>;
+
+              // Adjacency checks
+              const hasTop = y > 0 && shape[y-1][x] === 1;
+              const hasBottom = y < shape.length - 1 && shape[y+1][x] === 1;
+              const hasLeft = x > 0 && shape[y][x-1] === 1;
+              const hasRight = x < shape[0].length - 1 && shape[y][x+1] === 1;
+
+              // Corner radius
+              const radius = '4px'; 
+              const tl = !hasTop && !hasLeft ? radius : '0';
+              const tr = !hasTop && !hasRight ? radius : '0';
+              const bl = !hasBottom && !hasLeft ? radius : '0';
+              const br = !hasBottom && !hasRight ? radius : '0';
+
+              return (
+                <div key={`${x}-${y}`} className={`relative h-full w-full ${isInteractive ? 'pointer-events-auto cursor-grab active:cursor-grabbing' : ''}`}>
+                  <div 
+                    className="w-full h-full relative overflow-hidden transition-colors box-border"
+                    style={{ 
+                        backgroundColor: def.color,
+                        borderTop: !hasTop ? borderStyle : 'none',
+                        borderBottom: !hasBottom ? borderStyle : 'none',
+                        borderLeft: !hasLeft ? borderStyle : 'none',
+                        borderRight: !hasRight ? borderStyle : 'none',
+                        borderTopLeftRadius: tl,
+                        borderTopRightRadius: tr,
+                        borderBottomLeftRadius: bl,
+                        borderBottomRightRadius: br,
+                    }}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-black/10 pointer-events-none"></div>
+                    <div 
+                        className="absolute inset-0 pointer-events-none"
+                        style={{
+                            borderTop: !hasTop ? '1px solid rgba(255,255,255,0.4)' : 'none',
+                            borderLeft: !hasLeft ? '1px solid rgba(255,255,255,0.4)' : 'none',
+                            borderBottom: !hasBottom ? '1px solid rgba(0,0,0,0.2)' : 'none',
+                            borderRight: !hasRight ? '1px solid rgba(0,0,0,0.2)' : 'none',
+                            borderTopLeftRadius: tl,
+                            borderTopRightRadius: tr,
+                            borderBottomLeftRadius: bl,
+                            borderBottomRightRadius: br,
+                        }}
+                    ></div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const saveData = () => {
+    const data = { itemDefs, containerDefs, activeContainers, sortConfig, visualSettings };
+    const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = "inventory-layout.json";
+    link.href = url;
+    link.click();
+  };
+
+  const loadData = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            const data = JSON.parse(event.target.result);
+            if(data.itemDefs) setItemDefs(data.itemDefs);
+            if(data.containerDefs) setContainerDefs(data.containerDefs);
+            if(data.activeContainers) setActiveContainers(data.activeContainers);
+            if(data.sortConfig) setSortConfig(data.sortConfig);
+            if(data.visualSettings) setVisualSettings(data.visualSettings);
+        } catch (err) {
+            alert("Invalid save file");
+        }
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-indigo-500/30 flex flex-col" onMouseUp={handleMouseUp}>
+      
+      <div className="h-16 border-b border-slate-800 flex items-center px-6 justify-between bg-slate-900/80 backdrop-blur-md sticky top-0 z-40 shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="bg-indigo-600 p-2 rounded-lg shadow-lg shadow-indigo-500/20">
+             <Box size={20} className="text-white"/>
+          </div>
+          <h1 className="font-bold text-lg tracking-tight">Grid<span className="text-indigo-400">Forge</span></h1>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="flex bg-slate-800 rounded-lg p-1 gap-1 border border-slate-700/50">
+             <button title="Create Item" onClick={() => setEditorOpen({type: 'item', initialData: null})} className="px-3 py-1.5 hover:bg-slate-700 hover:text-white text-slate-300 rounded-md text-sm flex items-center gap-2 transition-all"><Plus size={14}/> Item</button>
+             <button title="Create Container" onClick={() => setEditorOpen({type: 'container', initialData: null})} className="px-3 py-1.5 hover:bg-slate-700 hover:text-white text-slate-300 rounded-md text-sm flex items-center gap-2 transition-all"><Plus size={14}/> Container</button>
+          </div>
+          
+          <div className="h-6 w-px bg-slate-800"></div>
+
+          <button onClick={saveData} className="flex items-center gap-2 text-sm hover:text-white text-slate-400 transition-colors bg-slate-800/50 hover:bg-slate-800 px-3 py-1.5 rounded-md border border-transparent hover:border-slate-700">
+            <Save size={16}/> Save
+          </button>
+          <label className="flex items-center gap-2 text-sm hover:text-white text-slate-400 transition-colors bg-slate-800/50 hover:bg-slate-800 px-3 py-1.5 rounded-md border border-transparent hover:border-slate-700 cursor-pointer">
+            <Upload size={16}/> Load
+            <input type="file" className="hidden" onChange={loadData} accept=".json"/>
+          </label>
+        </div>
+      </div>
+
+      <div className="flex flex-1 overflow-hidden">
+        
+        <div className="w-80 border-r border-slate-800 bg-slate-900 overflow-y-auto p-4 flex flex-col gap-6 shadow-2xl z-20">
+            
+            <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase text-slate-400 mb-3 tracking-wider">
+                    <Eye size={14} /> Visual Settings
+                </div>
+                <div className="space-y-6">
+                     <div>
+                        <div className="flex justify-between mb-1">
+                            <span className="text-xs text-slate-500">Grid Scale</span>
+                            <span className="text-xs text-slate-400">{visualSettings.gridScale}px</span>
+                        </div>
+                        <input 
+                            type="range" min="20" max="80" step="2" 
+                            value={visualSettings.gridScale} 
+                            onChange={e => setVisualSettings({...visualSettings, gridScale: Number(e.target.value)})}
+                            className="w-full accent-indigo-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                        />
+                     </div>
+                     
+                     {/* Border Settings */}
+                     <div>
+                        <span className="text-xs font-semibold text-slate-400 block mb-2">Border</span>
+                        <div className="space-y-3">
+                            <div>
+                                <div className="flex justify-between mb-1">
+                                    <span className="text-[10px] text-slate-500">Thickness</span>
+                                    <span className="text-[10px] text-slate-400">{visualSettings.thickness}px</span>
+                                </div>
+                                <input 
+                                    type="range" min="0" max="8" step="1" 
+                                    value={visualSettings.thickness} 
+                                    onChange={e => setVisualSettings({...visualSettings, thickness: Number(e.target.value)})}
+                                    className="w-full accent-indigo-500 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                                />
+                            </div>
+                            <div>
+                                <div className="flex justify-between mb-1">
+                                    <span className="text-[10px] text-slate-500">Opacity</span>
+                                    <span className="text-[10px] text-slate-400">{Math.round(visualSettings.opacity * 100)}%</span>
+                                </div>
+                                <input 
+                                    type="range" min="0" max="1" step="0.1" 
+                                    value={visualSettings.opacity} 
+                                    onChange={e => setVisualSettings({...visualSettings, opacity: Number(e.target.value)})}
+                                    className="w-full accent-indigo-500 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                                />
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-slate-500">Color</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-mono text-slate-400">{visualSettings.color}</span>
+                                    <input 
+                                        type="color" 
+                                        value={visualSettings.color} 
+                                        onChange={e => setVisualSettings({...visualSettings, color: e.target.value})}
+                                        className="w-5 h-5 rounded cursor-pointer border-none bg-transparent"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                     </div>
+
+                     {/* Image Fill Settings */}
+                     <div>
+                        <span className="text-xs font-semibold text-slate-400 block mb-2 flex items-center gap-2"><PaintBucket size={10}/> Image Background Fill</span>
+                        <div className="space-y-3">
+                            <div>
+                                <div className="flex justify-between mb-1">
+                                    <span className="text-[10px] text-slate-500">Fill Opacity</span>
+                                    <span className="text-[10px] text-slate-400">{Math.round(visualSettings.imageFillOpacity * 100)}%</span>
+                                </div>
+                                <input 
+                                    type="range" min="0" max="1" step="0.1" 
+                                    value={visualSettings.imageFillOpacity} 
+                                    onChange={e => setVisualSettings({...visualSettings, imageFillOpacity: Number(e.target.value)})}
+                                    className="w-full accent-indigo-500 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                                />
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-slate-500">Fill Color</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-mono text-slate-400">{visualSettings.imageFillColor}</span>
+                                    <input 
+                                        type="color" 
+                                        value={visualSettings.imageFillColor} 
+                                        onChange={e => setVisualSettings({...visualSettings, imageFillColor: e.target.value})}
+                                        className="w-5 h-5 rounded cursor-pointer border-none bg-transparent"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                     </div>
+                </div>
+            </div>
+
+            <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase text-slate-400 mb-3 tracking-wider">
+                    <Sliders size={14} /> Sort Settings
+                </div>
+                <div className="space-y-4">
+                    <label className="flex items-center gap-3 text-sm cursor-pointer group">
+                        <input type="checkbox" checked={sortConfig.allowRotate} onChange={e => setSortConfig({...sortConfig, allowRotate: e.target.checked})} className="rounded bg-slate-700 border-slate-600 text-indigo-500 focus:ring-offset-slate-900 w-4 h-4 cursor-pointer"/>
+                        <span className="group-hover:text-white transition-colors">Allow Rotation</span>
+                    </label>
+                    <label className="flex items-center gap-3 text-sm cursor-pointer group">
+                        <input type="checkbox" checked={sortConfig.allowFlip} onChange={e => setSortConfig({...sortConfig, allowFlip: e.target.checked})} className="rounded bg-slate-700 border-slate-600 text-indigo-500 focus:ring-offset-slate-900 w-4 h-4 cursor-pointer"/>
+                        <span className="group-hover:text-white transition-colors">Allow Flip</span>
+                    </label>
+                    <div>
+                        <span className="text-xs text-slate-500 block mb-1.5">Start Corner</span>
+                        <div className="relative">
+                          <select 
+                              value={sortConfig.startCorner} 
+                              onChange={e => setSortConfig({...sortConfig, startCorner: e.target.value})}
+                              className="w-full bg-slate-950 border border-slate-700 text-sm rounded-lg p-2.5 text-slate-300 outline-none focus:border-indigo-500 appearance-none cursor-pointer hover:bg-slate-925 transition-colors"
+                          >
+                              <option value="TL">Top Left</option>
+                              <option value="TR">Top Right</option>
+                              <option value="BL">Bottom Left</option>
+                              <option value="BR">Bottom Right</option>
+                          </select>
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                            <LayoutGrid size={14} />
+                          </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3 className="text-xs font-bold uppercase text-slate-400 mb-3 tracking-wider">Containers</h3>
+                <div className="grid grid-cols-2 gap-3">
+                    {containerDefs.map(def => (
+                        <div key={def.id} className="relative group">
+                          <button 
+                              onClick={() => setActiveContainers([...activeContainers, { instanceId: generateId(), defId: def.id, items: [] }])}
+                              className="w-full p-3 bg-slate-800 border border-slate-700 hover:border-indigo-500 hover:bg-slate-750 rounded-lg text-center transition-all active:scale-95 group flex flex-col items-center justify-center h-24"
+                          >
+                              <Grid3X3 className="mb-2 text-slate-500 group-hover:text-indigo-400 transition-colors" size={24}/>
+                              <span className="text-xs font-medium block truncate w-full text-slate-400 group-hover:text-slate-200">{def.name}</span>
+                          </button>
+                          <div className="absolute -top-1 -right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleEditContainer(def); }}
+                                className="p-1 bg-slate-700 text-white rounded-full hover:bg-indigo-500 shadow-lg border border-slate-600"
+                                title="Edit Container"
+                              >
+                                <Pencil size={10} />
+                              </button>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); deleteContainerDef(def.id); }}
+                                className="p-1 bg-slate-700 text-white rounded-full hover:bg-red-500 shadow-lg border border-slate-600"
+                                title="Delete Container"
+                              >
+                                <Trash2 size={10} />
+                              </button>
+                          </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div>
+                <h3 className="text-xs font-bold uppercase text-slate-400 mb-3 tracking-wider">Items</h3>
+                <div className="space-y-3 pb-8">
+                    {itemDefs.map(def => (
+                        <div 
+                            key={def.id}
+                            onMouseDown={(e) => handleMouseDown(e, { id: def.id, shape: def.shape, currentShape: def.shape, x: 0, y: 0 }, null, true)}
+                            className="p-4 bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-xl cursor-grab active:cursor-grabbing group relative overflow-hidden transition-all hover:bg-slate-750"
+                        >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-bold text-slate-300 group-hover:text-white transition-colors">{def.name}</span>
+                              <div className="flex items-center gap-1">
+                                <div className="w-2 h-2 rounded-full mr-2" style={{backgroundColor: def.color}}></div>
+                                
+                                <button 
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => { e.stopPropagation(); handleEditItem(def); }}
+                                  className="p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded transition-colors"
+                                  title="Edit Item"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                                <button 
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => { e.stopPropagation(); deleteItemDef(def.id); }}
+                                  className="p-1 text-slate-500 hover:text-red-400 hover:bg-slate-700 rounded transition-colors"
+                                  title="Delete Item"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <div className="flex justify-center items-center py-2 bg-slate-900/50 rounded-lg group-hover:bg-slate-900 transition-colors overflow-hidden relative min-h-[40px]">
+                                {def.image ? (
+                                    <div className="w-full h-10 relative overflow-hidden">
+                                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                                            <img src={def.image} alt="preview" className="h-10 w-auto object-contain opacity-80 group-hover:opacity-100 transition-opacity" />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div style={{ 
+                                        display: 'grid', 
+                                        gridTemplateColumns: `repeat(${def.shape[0].length}, 12px)`, 
+                                        gap: '2px' 
+                                    }}>
+                                        {def.shape.map(r => r.map((c, idx) => (
+                                            <div key={idx} className={`w-[12px] h-[12px] rounded-[2px] ${c ? '' : 'opacity-0'}`} style={{ backgroundColor: c ? def.color : 'transparent' }}/>
+                                        )))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+
+        <div className="flex-1 overflow-auto bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-slate-950 p-10 relative">
+             
+             {activeContainers.length === 0 && (
+                 <div className="flex flex-col items-center justify-center h-full text-slate-600 animate-in fade-in zoom-in duration-500">
+                     <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-4 border border-slate-800 shadow-xl">
+                        <Grid3X3 size={32} className="opacity-50 text-indigo-500"/>
+                     </div>
+                     <p className="text-lg font-medium text-slate-500">No containers active.</p>
+                     <p className="text-sm">Select a container from the sidebar to start prototyping.</p>
+                 </div>
+             )}
+
+             <div className="flex flex-wrap gap-8 items-start content-start">
+                 {activeContainers.map(c => {
+                    const def = containerDefs.find(d => d.id === c.defId);
+                    if(!def) return null;
+                    return (
+                        <div key={c.instanceId} className="relative group animate-in zoom-in duration-300">
+                            {renderGrid(c, def)}
+                        </div>
+                    );
+                 })}
+             </div>
+        </div>
+      </div>
+
+      {dragState && (
+        <div 
+            className="fixed pointer-events-none z-50 opacity-80"
+            style={{ 
+                left: mousePos.x, 
+                top: mousePos.y,
+                // Center the dragged item on mouse
+                transform: `translate(-50%, -50%)`
+            }}
+        >
+            <div style={{
+                width: dragState.item.currentShape[0].length * (visualSettings.gridScale + GAP),
+                height: dragState.item.currentShape.length * (visualSettings.gridScale + GAP),
+            }}>
+                <ItemVisual item={dragState.item} visualSettings={visualSettings} />
+            </div>
+            
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-900/90 border border-slate-700 px-3 py-1.5 rounded-lg text-[10px] text-slate-300 backdrop-blur flex items-center gap-2 shadow-xl">
+                <span className="flex items-center gap-1"><kbd className="bg-slate-700 px-1.5 py-0.5 rounded border border-slate-600 text-white font-sans">Q</kbd> Rotate</span>
+                <div className="w-px h-3 bg-slate-700"></div>
+                <span className="flex items-center gap-1"><kbd className="bg-slate-700 px-1.5 py-0.5 rounded border border-slate-600 text-white font-sans">E</kbd> Rotate</span>
+                <div className="w-px h-3 bg-slate-700"></div>
+                <span className="flex items-center gap-1"><kbd className="bg-slate-700 px-1.5 py-0.5 rounded border border-slate-600 text-white font-sans">W</kbd> Flip</span>
+            </div>
+        </div>
+      )}
+
+      {editorOpen && (
+          <ShapeEditor 
+            type={editorOpen.type} 
+            initialData={editorOpen.initialData}
+            onClose={() => setEditorOpen(null)}
+            onSave={handleSaveEditor}
+          />
+      )}
+
+      <div className="fixed bottom-4 right-4 text-xs font-medium text-slate-500 bg-slate-900/90 px-4 py-2 rounded-full backdrop-blur pointer-events-none border border-slate-800 shadow-lg z-30 flex items-center gap-3">
+          <span><span className="text-indigo-400">Drag</span> to Move</span>
+          <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
+          <span><span className="text-indigo-400">Q/E</span> to Rotate</span>
+          <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
+          <span><span className="text-indigo-400">W</span> to Flip</span>
+      </div>
+    </div>
+  );
+}
