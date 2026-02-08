@@ -4,7 +4,8 @@ import {
   Trash2, Grid3X3, Box, Settings, LayoutGrid,
   FlipHorizontal, Sliders, Eye, Image as ImageIcon, Move,
   Pencil, Lock, MousePointer2, PaintBucket
-} from 'lucide-react';
+}
+ from 'lucide-react';
 
 // --- Constants ---
 const GAP = 2;
@@ -230,23 +231,23 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
         onMouseUp={stopDragImage}
         onMouseLeave={stopDragImage}
     >
-      <div className="bg-slate-800 p-6 rounded-xl border border-slate-600 shadow-2xl w-[700px] max-h-[90vh] overflow-y-auto flex flex-col">
+      <div className="bg-surface p-6 rounded-xl border border-surface-600 shadow-2xl w-[700px] max-h-[90vh] overflow-y-auto flex flex-col">
         <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-white">
+            <h2 className="font-heading text-xl font-bold text-on-background">
             {initialData ? 'Edit' : 'Create New'} {type === 'item' ? 'Item' : 'Container'}
             </h2>
             
-            {image && ( // Changed from type === 'item' && image
-                <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700">
+            {type === 'item' && image && (
+                <div className="flex bg-surface-900 rounded-lg p-1 border border-surface-700">
                     <button 
                         onClick={() => setMode('grid')}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${mode === 'grid' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${mode === 'grid' ? 'bg-primary text-on-background' : 'text-on-surface hover:text-on-background'}`}
                     >
                         <Grid3X3 size={14}/> Edit Grid
                     </button>
                     <button 
                         onClick={() => setMode('image')}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${mode === 'image' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${mode === 'image' ? 'bg-primary text-on-background' : 'text-on-surface hover:text-on-background'}`}
                     >
                         <Move size={14}/> Move Image
                     </button>
@@ -255,10 +256,10 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
         </div>
         
         <div className="flex gap-6 mb-6">
-            <div className="flex-1 bg-slate-900/50 p-8 rounded border border-slate-700/50 overflow-hidden select-none flex justify-center items-center relative min-h-[300px]">
+            <div className="flex-1 bg-surface/50 p-8 rounded border border-surface-700/50 overflow-hidden select-none flex justify-center items-center relative min-h-[300px]">
                 {/* Hitbox border visualization */}
                 <div 
-                    className="absolute border-2 border-dashed border-slate-600/30 pointer-events-none"
+                    className="absolute border-2 border-dashed border-surface-600/30 pointer-events-none"
                     style={{
                         width: width * EDITOR_CELL + Math.max(0, width - 1) * EDITOR_GAP,
                         height: height * EDITOR_CELL + Math.max(0, height - 1) * EDITOR_GAP
@@ -276,9 +277,9 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
                     <div 
                         key={`${r}-${c}`}
                         onClick={() => toggleCell(r, c)}
-                        className={`w-[30px] h-[30px] border border-slate-600/50 cursor-pointer rounded-sm hover:ring-2 ring-white/50 transition-all z-20 ${
+                        className={`w-[30px] h-[30px] border border-surface-600/50 cursor-pointer rounded-sm hover:ring-2 ring-on-background/50 transition-all z-20 ${
                         cell === 1 
-                            ? (type === 'item' ? 'bg-indigo-500/50' : 'bg-slate-200/50') 
+                            ? (type === 'item' ? 'bg-primary-500/50' : 'bg-surface-200/50') 
                             : 'bg-transparent'
                         }`}
                     />
@@ -309,7 +310,7 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
                             }}
                         />
                         {mode === 'image' && (
-                            <div className="absolute inset-0 border border-indigo-400 opacity-50 pointer-events-none"></div>
+                            <div className="absolute inset-0 border border-primary-400 opacity-50 pointer-events-none"></div>
                         )}
                     </div>
                 )}
@@ -319,33 +320,43 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
 
             <div className="w-64 space-y-5">
                 <div>
-                    <label className="text-xs text-slate-400 block mb-1">Dimensions</label>
+                    <label className="text-xs text-on-surface block mb-1">Dimensions</label>
                     <div className="flex gap-2">
                         <div className="relative flex-1">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">W</span>
-                            <input type="number" value={width} onChange={e => setWidth(Number(e.target.value))} className="w-full bg-slate-900 text-white pl-6 pr-2 py-1.5 rounded border border-slate-700 focus:border-indigo-500 outline-none text-sm" min="1" max="10"/>
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-on-surface">W</span>
+                            <input type="number" value={width} onChange={e => setWidth(Number(e.target.value))} className="w-full bg-background text-on-background pl-6 pr-2 py-1.5 rounded border border-surface-700 focus:border-primary-500 outline-none text-sm" min="1" max="10"/>
                         </div>
                         <div className="relative flex-1">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">H</span>
-                            <input type="number" value={height} onChange={e => setHeight(Number(e.target.value))} className="w-full bg-slate-900 text-white pl-6 pr-2 py-1.5 rounded border border-slate-700 focus:border-indigo-500 outline-none text-sm" min="1" max="10"/>
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-on-surface">H</span>
+                            <input type="number" value={height} onChange={e => setHeight(Number(e.target.value))} className="w-full bg-background text-on-background pl-6 pr-2 py-1.5 rounded border border-surface-700 focus:border-primary-500 outline-none text-sm" min="1" max="10"/>
                         </div>
                     </div>
                 </div>
 
                 <div>
-                    <label className="text-xs text-slate-400 block mb-1">Name</label>
-                    <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-slate-900 text-white p-2 rounded border border-slate-700 focus:border-indigo-500 outline-none text-sm" placeholder="Ex: Health Potion"/>
+                    <label className="text-xs text-on-surface block mb-1">Name</label>
+                    <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-background text-on-background p-2 rounded border border-surface-700 focus:border-primary-500 outline-none text-sm" placeholder="Ex: Health Potion"/>
                 </div>
 
                 {type === 'item' && (
                 <div>
-                    <label className="text-xs text-slate-400 block mb-1">Color</label>
-                    <div className="flex gap-1.5 flex-wrap">
+                    <label className="text-xs text-on-surface block mb-1">Color</label>
+                    <div className="flex items-center gap-2 mb-2"> {/* New row for color picker */}
+                        <input 
+                            type="color" 
+                            value={color} 
+                            onChange={e => setColor(e.target.value)}
+                            className="w-8 h-8 rounded-md cursor-pointer border-none bg-transparent"
+                            title="Pick a custom color"
+                        />
+                        <span className="text-sm text-on-surface">{color}</span>
+                    </div>
+                    <div className="flex gap-1.5 flex-wrap"> {/* Existing color palette */}
                     {['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#6366f1', '#a855f7', '#ec4899', '#94a3b8'].map(c => (
                         <button 
                         key={c}
                         onClick={() => setColor(c)}
-                        className={`w-5 h-5 rounded-full transition-transform hover:scale-110 ${color === c ? 'ring-2 ring-white scale-110' : ''}`}
+                        className={`w-5 h-5 rounded-full transition-transform hover:scale-110 ${color === c ? 'ring-2 ring-on-background scale-110' : ''}`}
                         style={{ backgroundColor: c }}
                         />
                     ))}
@@ -353,12 +364,12 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
                 </div>
                 )}
 
-                {(type === 'item' || type === 'container') && (
-                    <div className="pt-4 border-t border-slate-700">
-                        <label className="text-xs font-bold text-slate-400 flex items-center gap-2 mb-2"><ImageIcon size={14}/> Image Asset</label>
+                {type === 'item' && (
+                    <div className="pt-4 border-t border-surface-700">
+                        <label className="text-xs font-bold text-on-surface flex items-center gap-2 mb-2"><ImageIcon size={14}/> Image Asset</label>
                         
                         {!image ? (
-                            <label className="flex flex-col items-center justify-center h-20 border-2 border-dashed border-slate-700 rounded hover:border-indigo-500 hover:bg-slate-800 transition-colors cursor-pointer text-slate-500 text-[10px]">
+                            <label className="flex flex-col items-center justify-center h-20 border-2 border-dashed border-surface-700 rounded hover:border-primary-500 hover:bg-surface-800 transition-colors cursor-pointer text-on-surface text-[10px]">
                                 <Upload size={16} className="mb-1"/>
                                 <span>Click to Upload</span>
                                 <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
@@ -366,7 +377,7 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
                         ) : (
                             <div className="space-y-3">
                                 <div>
-                                    <div className="flex justify-between text-xs text-slate-500 mb-1">
+                                    <div className="flex justify-between text-xs text-on-surface mb-1">
                                         <span>Scale</span>
                                         <span>{imgScale}px</span>
                                     </div>
@@ -374,12 +385,12 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
                                         type="range" min="20" max="400" 
                                         value={imgScale} 
                                         onChange={e => setImgScale(Number(e.target.value))}
-                                        className="w-full accent-indigo-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                                        className="w-full accent-primary h-2 bg-surface-700 rounded-lg appearance-none cursor-pointer"
                                         disabled={mode !== 'image'}
                                     />
                                 </div>
                                 <div className="flex gap-2">
-                                    <label className="flex-1 text-center py-1.5 bg-slate-800 border border-slate-700 rounded cursor-pointer hover:bg-slate-700 text-[10px] text-slate-300">
+                                    <label className="flex-1 text-center py-1.5 bg-surface-800 border border-surface-700 rounded cursor-pointer hover:bg-surface-700 text-[10px] text-on-surface">
                                         Change
                                         <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                                     </label>
@@ -392,9 +403,9 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
             </div>
         </div>
 
-        <div className="flex justify-end gap-2 pt-4 border-t border-slate-700 mt-auto">
-          <button onClick={onClose} className="px-4 py-2 text-slate-300 hover:bg-slate-700 rounded transition-colors">Cancel</button>
-          <button onClick={handleSave} className="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-500 rounded font-bold transition-colors shadow-lg shadow-indigo-500/20">Save Asset</button>
+        <div className="flex justify-end gap-2 pt-4 border-t border-surface-700 mt-auto">
+          <button onClick={onClose} className="px-4 py-2 text-on-surface hover:bg-surface-700 rounded transition-colors">Cancel</button>
+          <button onClick={handleSave} className="px-4 py-2 bg-primary text-on-background hover:bg-primary-500 rounded font-bold transition-colors shadow-lg shadow-primary/20">Save Asset</button>
         </div>
       </div>
     </div>
@@ -425,7 +436,7 @@ export default function App() {
   
   const [sortConfig, setSortConfig] = useState(() => {
     try {
-      const saved = localStorage.getItem('gridForge_sortConfig');
+      const saved = localStorage.getItem('gridForge_sort');
       return saved ? JSON.parse(saved) : {
         allowRotate: true,
         allowFlip: true,
@@ -800,14 +811,14 @@ export default function App() {
     return (
       <div 
         onMouseLeave={() => setHoverTarget(null)}
-        className="relative bg-slate-900/50 p-3 rounded-xl border border-slate-700 shadow-inner inline-block backdrop-blur-sm"
+        className="relative bg-surface/50 p-3 rounded-xl border border-surface-700 shadow-inner inline-block backdrop-blur-sm"
       >
-        <div className="flex justify-between items-center mb-3 text-slate-400 text-xs uppercase tracking-wider font-bold">
-            <span className="flex items-center gap-2"><Box size={14} className="text-indigo-400"/> {containerDef.name}</span>
-            <div className="flex gap-1 bg-slate-800 rounded p-0.5">
-                <button title="Auto Sort" onClick={() => autoSort(containerInstance.instanceId)} className="p-1 hover:bg-indigo-600 hover:text-white rounded transition-colors text-slate-400"><LayoutGrid size={14} /></button>
-                <div className="w-px bg-slate-700 mx-0.5"></div>
-                <button title="Delete Container" onClick={() => setActiveContainers(prev => prev.filter(c => c.instanceId !== containerInstance.instanceId))} className="p-1 hover:bg-red-500 hover:text-white rounded transition-colors text-slate-400"><Trash2 size={14} /></button>
+        <div className="flex justify-between items-center mb-3 text-on-surface text-xs uppercase tracking-wider font-bold">
+            <span className="flex items-center gap-2"><Box size={14} className="text-primary-400"/> {containerDef.name}</span>
+            <div className="flex gap-1 bg-surface-800 rounded p-0.5">
+                <button title="Auto Sort" onClick={() => autoSort(containerInstance.instanceId)} className="p-1 hover:bg-primary hover:text-on-background rounded transition-colors text-on-surface"><LayoutGrid size={14} /></button>
+                <div className="w-px bg-surface-700 mx-0.5"></div>
+                <button title="Delete Container" onClick={() => setActiveContainers(prev => prev.filter(c => c.instanceId !== containerInstance.instanceId))} className="p-1 hover:bg-red-500 hover:text-on-background rounded transition-colors text-on-surface"><Trash2 size={14} /></button>
             </div>
         </div>
 
@@ -817,25 +828,7 @@ export default function App() {
             className="relative"
             data-drop-container-id={containerInstance.instanceId}
         >
-          {/* Container Image Background */}
-          {containerDef.image && containerDef.imageConfig && (
-            <div 
-              className="absolute inset-0 z-0 overflow-hidden"
-            >
-              <img 
-                src={containerDef.image} 
-                alt={`${containerDef.name} background`}
-                className="absolute"
-                style={{
-                  width: `${containerDef.imageConfig.scale * (scale / 30)}px`, // scale original image scale by ratio
-                  left: '50%',
-                  top: '50%',
-                  transform: `translate(-50%, -50%) translate(${containerDef.imageConfig.x * (scale / 30)}px, ${containerDef.imageConfig.y * (scale / 30)}px)`,
-                  zIndex: 0 // Ensure it's behind the grid cells
-                }}
-              />
-            </div>
-          )}
+
           {containerDef.shape.map((row, y) => (
             row.map((cell, x) => {
               const isGhost = ghostCells.some(g => g.x === x && g.y === y);
@@ -844,11 +837,11 @@ export default function App() {
                 <div 
                   key={`cell-${x}-${y}`}
                                     className={`
-                                      rounded transition-colors duration-75
+                                      rounded transition-colors duration-75 z-10
                                       ${isGhost
-                                          ? `opacity-100 ${isValidPlacement ? 'bg-emerald-500/50 border-emerald-400' : 'bg-red-500/50 border-red-400'}`
+                                          ? `opacity-100 ${isValidPlacement ? 'bg-emerald-500/30 border-emerald-400' : 'bg-red-500/30 border-red-400'}` // Reduced opacity for ghost cells
                                           : cell === 1
-                                              ? `bg-slate-800 border border-slate-700/50 ${dragState ? 'hover:bg-slate-700 hover:border-slate-500' : ''}`
+                                              ? `bg-surface-800/70 border border-surface-700/50 ${dragState ? 'hover:bg-surface-700 hover:border-surface-500' : ''}` // Reduced opacity for normal cells
                                               : 'opacity-0'
                                       }
                                     `}                  style={{ width: scale, height: scale }}
@@ -1089,28 +1082,28 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-indigo-500/30 flex flex-col" onMouseUp={handleMouseUp}>
+    <div className="min-h-screen bg-background text-on-background font-body selection:bg-primary/30 flex flex-col" onMouseUp={handleMouseUp}>
       
-      <div className="h-16 border-b border-slate-800 flex items-center px-6 justify-between bg-slate-900/80 backdrop-blur-md sticky top-0 z-40 shadow-lg">
+      <div className="h-16 border-b border-surface/50 flex items-center px-6 justify-between bg-surface/80 backdrop-blur-md sticky top-0 z-40 shadow-lg">
         <div className="flex items-center gap-3">
-          <div className="bg-indigo-600 p-2 rounded-lg shadow-lg shadow-indigo-500/20">
+          <div className="bg-primary p-2 rounded-lg shadow-lg shadow-primary/20">
              <Box size={20} className="text-white"/>
           </div>
-          <h1 className="font-bold text-lg tracking-tight">Grid<span className="text-indigo-400">Forge</span></h1>
+          <h1 className="font-heading font-bold text-lg tracking-tight">Grid<span className="text-primary-400">Forge</span></h1>
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="flex bg-slate-800 rounded-lg p-1 gap-1 border border-slate-700/50">
-             <button title="Create Item" onClick={() => setEditorOpen({type: 'item', initialData: null})} className="px-3 py-1.5 hover:bg-slate-700 hover:text-white text-slate-300 rounded-md text-sm flex items-center gap-2 transition-all"><Plus size={14}/> Item</button>
-             <button title="Create Container" onClick={() => setEditorOpen({type: 'container', initialData: null})} className="px-3 py-1.5 hover:bg-slate-700 hover:text-white text-slate-300 rounded-md text-sm flex items-center gap-2 transition-all"><Plus size={14}/> Container</button>
+          <div className="flex bg-surface rounded-lg p-1 gap-1 border border-surface/50">
+             <button title="Create Item" onClick={() => setEditorOpen({type: 'item', initialData: null})} className="px-3 py-1.5 hover:bg-surface-700 hover:text-on-background text-on-surface rounded-md text-sm flex items-center gap-2 transition-all"><Plus size={14}/> Item</button>
+             <button title="Create Container" onClick={() => setEditorOpen({type: 'container', initialData: null})} className="px-3 py-1.5 hover:bg-surface-700 hover:text-on-background text-on-surface rounded-md text-sm flex items-center gap-2 transition-all"><Plus size={14}/> Container</button>
           </div>
           
-          <div className="h-6 w-px bg-slate-800"></div>
+          <div className="h-6 w-px bg-surface-800"></div>
 
-          <button onClick={saveData} className="flex items-center gap-2 text-sm hover:text-white text-slate-400 transition-colors bg-slate-800/50 hover:bg-slate-800 px-3 py-1.5 rounded-md border border-transparent hover:border-slate-700">
+          <button onClick={saveData} className="flex items-center gap-2 text-sm hover:text-on-background text-on-surface transition-colors bg-surface/50 hover:bg-surface px-3 py-1.5 rounded-md border border-transparent hover:border-surface-700">
             <Save size={16}/> Save
           </button>
-          <label className="flex items-center gap-2 text-sm hover:text-white text-slate-400 transition-colors bg-slate-800/50 hover:bg-slate-800 px-3 py-1.5 rounded-md border border-transparent hover:border-slate-700 cursor-pointer">
+          <label className="flex items-center gap-2 text-sm hover:text-on-background text-on-surface transition-colors bg-surface/50 hover:bg-surface px-3 py-1.5 rounded-md border border-transparent hover:border-surface-700 cursor-pointer">
             <Upload size={16}/> Load
             <input type="file" className="hidden" onChange={loadData} accept=".json"/>
           </label>
@@ -1119,58 +1112,58 @@ export default function App() {
 
       <div className="flex flex-1 overflow-hidden">
         
-        <div className="w-80 border-r border-slate-800 bg-slate-900 overflow-y-auto p-4 flex flex-col gap-6 shadow-2xl z-20">
+        <div className="w-80 border-r border-surface/50 bg-surface overflow-y-auto p-4 flex flex-col gap-6 shadow-2xl z-20">
             
-            <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase text-slate-400 mb-3 tracking-wider">
+            <div className="p-4 bg-surface/50 rounded-xl border border-surface/50">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase text-on-surface mb-3 tracking-wider">
                     <Eye size={14} /> Visual Settings
                 </div>
                 <div className="space-y-6">
                      <div>
                         <div className="flex justify-between mb-1">
-                            <span className="text-xs text-slate-500">Grid Scale</span>
-                            <span className="text-xs text-slate-400">{visualSettings.gridScale}px</span>
+                            <span className="text-xs text-on-surface">Grid Scale</span>
+                            <span className="text-xs text-on-surface">{visualSettings.gridScale}px</span>
                         </div>
                         <input 
                             type="range" min="20" max="80" step="2" 
                             value={visualSettings.gridScale} 
                             onChange={e => setVisualSettings({...visualSettings, gridScale: Number(e.target.value)})}
-                            className="w-full accent-indigo-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                            className="w-full accent-primary h-2 bg-surface-700 rounded-lg appearance-none cursor-pointer"
                         />
                      </div>
                      
                      {/* Border Settings */}
                      <div>
-                        <span className="text-xs font-semibold text-slate-400 block mb-2">Border</span>
+                        <span className="text-xs font-semibold text-on-surface block mb-2">Border</span>
                         <div className="space-y-3">
                             <div>
                                 <div className="flex justify-between mb-1">
-                                    <span className="text-[10px] text-slate-500">Thickness</span>
-                                    <span className="text-[10px] text-slate-400">{visualSettings.thickness}px</span>
+                                    <span className="text-[10px] text-on-surface">Thickness</span>
+                                    <span className="text-[10px] text-on-surface">{visualSettings.thickness}px</span>
                                 </div>
                                 <input 
                                     type="range" min="0" max="8" step="1" 
                                     value={visualSettings.thickness} 
                                     onChange={e => setVisualSettings({...visualSettings, thickness: Number(e.target.value)})}
-                                    className="w-full accent-indigo-500 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                                    className="w-full accent-primary h-1.5 bg-surface-700 rounded-lg appearance-none cursor-pointer"
                                 />
                             </div>
                             <div>
                                 <div className="flex justify-between mb-1">
-                                    <span className="text-[10px] text-slate-500">Opacity</span>
-                                    <span className="text-[10px] text-slate-400">{Math.round(visualSettings.opacity * 100)}%</span>
+                                    <span className="text-[10px] text-on-surface">Opacity</span>
+                                    <span className="text-[10px] text-on-surface">{Math.round(visualSettings.opacity * 100)}%</span>
                                 </div>
                                 <input 
                                     type="range" min="0" max="1" step="0.1" 
                                     value={visualSettings.opacity} 
                                     onChange={e => setVisualSettings({...visualSettings, opacity: Number(e.target.value)})}
-                                    className="w-full accent-indigo-500 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                                    className="w-full accent-primary h-1.5 bg-surface-700 rounded-lg appearance-none cursor-pointer"
                                 />
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="text-[10px] text-slate-500">Color</span>
+                                <span className="text-[10px] text-on-surface">Color</span>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-mono text-slate-400">{visualSettings.color}</span>
+                                    <span className="text-[10px] font-mono text-on-surface">{visualSettings.color}</span>
                                     <input 
                                         type="color" 
                                         value={visualSettings.color} 
@@ -1184,28 +1177,28 @@ export default function App() {
 
                      {/* Image Fill Settings */}
                      <div>
-                        <span className="text-xs font-semibold text-slate-400 block mb-2 flex items-center gap-2"><PaintBucket size={10}/> Image Background Fill</span>
+                        <span className="text-xs font-semibold text-on-surface block mb-2 flex items-center gap-2"><PaintBucket size={10}/> Image Background Fill</span>
                         <div className="space-y-3">
                             <div>
                                 <div className="flex justify-between mb-1">
-                                    <span className="text-[10px] text-slate-500">Fill Opacity</span>
-                                    <span className="text-[10px] text-slate-400">{Math.round(visualSettings.imageFillOpacity * 100)}%</span>
+                                    <span className="text-[10px] text-on-surface">Fill Opacity</span>
+                                    <span className="text-[10px] text-on-surface">{Math.round(visualSettings.imageFillOpacity * 100)}%</span>
                                 </div>
                                 <input 
                                     type="range" min="0" max="1" step="0.1" 
                                     value={visualSettings.imageFillOpacity} 
                                     onChange={e => setVisualSettings({...visualSettings, imageFillOpacity: Number(e.target.value)})}
-                                    className="w-full accent-indigo-500 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                                    className="w-full accent-primary h-1.5 bg-surface-700 rounded-lg appearance-none cursor-pointer"
                                 />
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="text-[10px] text-slate-500">Fill Color</span>
+                                <span className="text-[10px] text-on-surface">Fill Color</span>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-mono text-slate-400">{visualSettings.imageFillColor}</span>
+                                    <span className="text-[10px] font-mono text-on-surface">{visualSettings.imageFillColor}</span>
                                     <input 
                                         type="color" 
                                         value={visualSettings.imageFillColor} 
-                                        onChange={e => setVisualSettings({...visualSettings, color: e.target.value})}
+                                        onChange={e => setVisualSettings({...visualSettings, imageFillColor: e.target.value})}
                                         className="w-5 h-5 rounded cursor-pointer border-none bg-transparent"
                                     />
                                 </div>
@@ -1215,33 +1208,33 @@ export default function App() {
                 </div>
             </div>
 
-            <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase text-slate-400 mb-3 tracking-wider">
+            <div className="p-4 bg-surface/50 rounded-xl border border-surface/50">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase text-on-surface mb-3 tracking-wider">
                     <Sliders size={14} /> Sort Settings
                 </div>
                 <div className="space-y-4">
                     <label className="flex items-center gap-3 text-sm cursor-pointer group">
-                        <input type="checkbox" checked={sortConfig.allowRotate} onChange={e => setSortConfig({...sortConfig, allowRotate: e.target.checked})} className="rounded bg-slate-700 border-slate-600 text-indigo-500 focus:ring-offset-slate-900 w-4 h-4 cursor-pointer"/>
-                        <span className="group-hover:text-white transition-colors">Allow Rotation</span>
+                        <input type="checkbox" checked={sortConfig.allowRotate} onChange={e => setSortConfig({...sortConfig, allowRotate: e.target.checked})} className="rounded bg-surface-700 border-surface-600 text-primary focus:ring-offset-background w-4 h-4 cursor-pointer"/>
+                        <span className="group-hover:text-on-background transition-colors">Allow Rotation</span>
                     </label>
                     <label className="flex items-center gap-3 text-sm cursor-pointer group">
-                        <input type="checkbox" checked={sortConfig.allowFlip} onChange={e => setSortConfig({...sortConfig, allowFlip: e.target.checked})} className="rounded bg-slate-700 border-slate-600 text-indigo-500 focus:ring-offset-slate-900 w-4 h-4 cursor-pointer"/>
-                        <span className="group-hover:text-white transition-colors">Allow Flip</span>
+                        <input type="checkbox" checked={sortConfig.allowFlip} onChange={e => setSortConfig({...sortConfig, allowFlip: e.target.checked})} className="rounded bg-surface-700 border-surface-600 text-primary focus:ring-offset-background w-4 h-4 cursor-pointer"/>
+                        <span className="group-hover:text-on-background transition-colors">Allow Flip</span>
                     </label>
                     <div>
-                        <span className="text-xs text-slate-500 block mb-1.5">Start Corner</span>
+                        <span className="text-xs text-on-surface block mb-1.5">Start Corner</span>
                         <div className="relative">
                           <select 
                               value={sortConfig.startCorner} 
                               onChange={e => setSortConfig({...sortConfig, startCorner: e.target.value})}
-                              className="w-full bg-slate-950 border border-slate-700 text-sm rounded-lg p-2.5 text-slate-300 outline-none focus:border-indigo-500 appearance-none cursor-pointer hover:bg-slate-925 transition-colors"
+                              className="w-full bg-background border border-surface-700 text-sm rounded-lg p-2.5 text-on-surface outline-none focus:border-primary-500 appearance-none cursor-pointer hover:bg-surface transition-colors"
                           >
                               <option value="TL">Top Left</option>
                               <option value="TR">Top Right</option>
                               <option value="BL">Bottom Left</option>
                               <option value="BR">Bottom Right</option>
                           </select>
-                          <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface">
                             <LayoutGrid size={14} />
                           </div>
                         </div>
@@ -1250,11 +1243,11 @@ export default function App() {
             </div>
 
             <div>
-                <h3 className="text-xs font-bold uppercase text-slate-400 mb-3 tracking-wider">Containers</h3>
+                <h3 className="text-xs font-bold uppercase text-on-surface mb-3 tracking-wider">Containers</h3>
                 <input 
                   type="text" 
                   placeholder="Search containers..." 
-                  className="w-full bg-slate-900 text-white p-2 rounded border border-slate-700 focus:border-indigo-500 outline-none text-sm mb-4"
+                  className="w-full bg-background text-on-background p-2 rounded border border-surface-700 focus:border-primary-500 outline-none text-sm mb-4"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -1265,22 +1258,22 @@ export default function App() {
                         <div key={def.id} className="relative group">
                           <button 
                               onClick={() => setActiveContainers([...activeContainers, { instanceId: generateId(), defId: def.id, items: [] }])}
-                              className="w-full p-2 bg-slate-800 border border-slate-700 hover:border-indigo-500 hover:bg-slate-750 rounded-lg text-center transition-all active:scale-95 group flex flex-col items-center justify-center h-16"
+                              className="w-full p-2 bg-surface-800 border border-surface-700 hover:border-primary hover:bg-surface-700 rounded-lg text-center transition-all active:scale-95 group flex flex-col items-center justify-center h-16"
                           >
-                              <Grid3X3 className="mb-1 text-slate-500 group-hover:text-indigo-400 transition-colors" size={18}/>
-                              <span className="text-xs font-medium block truncate w-full text-slate-400 group-hover:text-slate-200">{def.name}</span>
+                              <Grid3X3 className="mb-1 text-on-surface group-hover:text-primary-400 transition-colors" size={18}/>
+                              <span className="text-on-surface block truncate w-full group-hover:text-on-background">{def.name}</span>
                           </button>
                           <div className="absolute -top-1 -right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button 
                                 onClick={(e) => { e.stopPropagation(); handleEditContainer(def); }}
-                                className="p-1 bg-slate-700 text-white rounded-full hover:bg-indigo-500 shadow-lg border border-slate-600"
+                                className="p-1 bg-surface-700 text-on-background rounded-full hover:bg-primary shadow-lg border border-surface-600"
                                 title="Edit Container"
                               >
                                 <Pencil size={10} />
                               </button>
                               <button 
                                 onClick={(e) => { e.stopPropagation(); deleteContainerDef(def.id); }}
-                                className="p-1 bg-slate-700 text-white rounded-full hover:bg-red-500 shadow-lg border border-slate-600"
+                                className="p-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded hover:bg-red-500/20"
                                 title="Delete Container"
                               >
                                 <Trash2 size={10} />
@@ -1292,11 +1285,11 @@ export default function App() {
             </div>
 
             <div>
-                <h3 className="text-xs font-bold uppercase text-slate-400 mb-3 tracking-wider">Items</h3>
+                <h3 className="text-xs font-bold uppercase text-on-surface mb-3 tracking-wider">Items</h3>
                 <input 
                   type="text" 
                   placeholder="Search items..." 
-                  className="w-full bg-slate-900 text-white p-2 rounded border border-slate-700 focus:border-indigo-500 outline-none text-sm mb-4"
+                  className="w-full bg-background text-on-background p-2 rounded border border-surface-700 focus:border-primary-500 outline-none text-sm mb-4"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -1307,17 +1300,17 @@ export default function App() {
                         <div 
                             key={def.id}
                             onMouseDown={(e) => handleMouseDown(e, { id: def.id, shape: def.shape, currentShape: def.shape, x: 0, y: 0 }, null, true)}
-                            className="p-3 bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-xl cursor-grab active:cursor-grabbing group relative overflow-hidden transition-all hover:bg-slate-750"
+                            className="p-3 bg-surface-800 border border-surface-700 hover:border-surface-500 rounded-xl cursor-grab active:cursor-grabbing group relative overflow-hidden transition-all hover:bg-surface-700"
                         >
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs font-bold text-slate-300 group-hover:text-white transition-colors">{def.name}</span>
+                              <span className="text-xs font-bold text-on-surface group-hover:text-on-background transition-colors">{def.name}</span>
                               <div className="flex items-center gap-1">
                                 <div className="w-2 h-2 rounded-full mr-2" style={{backgroundColor: def.color}}></div>
                                 
                                 <button 
                                   onMouseDown={(e) => e.stopPropagation()}
                                   onClick={(e) => { e.stopPropagation(); handleEditItem(def); }}
-                                  className="p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded transition-colors"
+                                  className="p-1 text-on-surface hover:text-on-background hover:bg-surface-700 rounded transition-colors"
                                   title="Edit Item"
                                 >
                                   <Pencil size={12} />
@@ -1325,7 +1318,7 @@ export default function App() {
                                 <button 
                                   onMouseDown={(e) => e.stopPropagation()}
                                   onClick={(e) => { e.stopPropagation(); deleteItemDef(def.id); }}
-                                  className="p-1 text-slate-500 hover:text-red-400 hover:bg-slate-700 rounded transition-colors"
+                                  className="p-1 text-on-surface hover:text-red-400 hover:bg-surface-700 rounded transition-colors"
                                   title="Delete Item"
                                 >
                                   <Trash2 size={12} />
@@ -1333,7 +1326,7 @@ export default function App() {
                               </div>
                             </div>
                             
-                            <div className="flex justify-center items-center py-2 bg-slate-900/50 rounded-lg group-hover:bg-slate-900 transition-colors overflow-hidden relative min-h-[30px]">
+                            <div className="flex justify-center items-center py-2 bg-background/50 rounded-lg group-hover:bg-background transition-colors overflow-hidden relative min-h-[30px]">
                                 {def.image ? (
                                     <div className="w-full h-8 relative overflow-hidden">
                                         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -1358,15 +1351,15 @@ export default function App() {
             </div>
         </div>
 
-        <div className="flex-1 overflow-auto bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-slate-950 p-10 relative">
+        <div className="flex-1 overflow-auto bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-surface via-background to-background p-10 relative">
              
              {activeContainers.length === 0 && (
-                 <div className="flex flex-col items-center justify-center h-full text-slate-600 animate-in fade-in zoom-in duration-500">
-                     <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-4 border border-slate-800 shadow-xl">
-                        <Grid3X3 size={32} className="opacity-50 text-indigo-500"/>
+                 <div className="flex flex-col items-center justify-center h-full text-on-surface-600 animate-in fade-in zoom-in duration-500">
+                     <div className="w-16 h-16 bg-surface rounded-2xl flex items-center justify-center mb-4 border border-surface-800 shadow-xl">
+                        <Grid3X3 size={32} className="opacity-50 text-primary"/>
                      </div>
-                     <p className="text-lg font-medium text-slate-500">No containers active.</p>
-                     <p className="text-sm">Select a container from the sidebar to start prototyping.</p>
+                     <p className="text-lg font-medium text-on-surface-500">No containers active.</p>
+                     <p className="text-sm text-on-surface">Select a container from the sidebar to start prototyping.</p>
                  </div>
              )}
 
@@ -1401,12 +1394,12 @@ export default function App() {
                 <ItemVisual item={dragState.item} visualSettings={visualSettings} />
             </div>
             
-            <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-900/90 border border-slate-700 px-3 py-1.5 rounded-lg text-[10px] text-slate-300 backdrop-blur flex items-center gap-2 shadow-xl">
-                <span className="flex items-center gap-1"><kbd className="bg-slate-700 px-1.5 py-0.5 rounded border border-slate-600 text-white font-sans">Q</kbd> Rotate</span>
-                <div className="w-px h-3 bg-slate-700"></div>
-                <span className="flex items-center gap-1"><kbd className="bg-slate-700 px-1.5 py-0.5 rounded border border-slate-600 text-white font-sans">E</kbd> Rotate</span>
-                <div className="w-px h-3 bg-slate-700"></div>
-                <span className="flex items-center gap-1"><kbd className="bg-slate-700 px-1.5 py-0.5 rounded border border-slate-600 text-white font-sans">W</kbd> Flip</span>
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap bg-surface/90 border border-surface-700 px-3 py-1.5 rounded-lg text-[10px] text-on-surface backdrop-blur flex items-center gap-2 shadow-xl">
+                <span className="flex items-center gap-1"><kbd className="bg-surface-700 px-1.5 py-0.5 rounded border border-surface-600 text-on-background font-body">Q</kbd> Rotate</span>
+                <div className="w-px h-3 bg-surface-700"></div>
+                <span className="flex items-center gap-1"><kbd className="bg-surface-700 px-1.5 py-0.5 rounded border border-surface-600 text-on-background font-body">E</kbd> Rotate</span>
+                <div className="w-px h-3 bg-surface-700"></div>
+                <span className="flex items-center gap-1"><kbd className="bg-surface-700 px-1.5 py-0.5 rounded border border-surface-600 text-on-background font-body">W</kbd> Flip</span>
             </div>
         </div>
       )}
@@ -1420,12 +1413,12 @@ export default function App() {
           />
       )}
 
-      <div className="fixed bottom-4 right-4 text-xs font-medium text-slate-500 bg-slate-900/90 px-4 py-2 rounded-full backdrop-blur pointer-events-none border border-slate-800 shadow-lg z-30 flex items-center gap-3">
-          <span><span className="text-indigo-400">Drag</span> to Move</span>
-          <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
-          <span><span className="text-indigo-400">Q/E</span> to Rotate</span>
-          <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
-          <span><span className="text-indigo-400">W</span> to Flip</span>
+      <div className="fixed bottom-4 right-4 text-xs font-medium text-on-surface bg-surface/90 px-4 py-2 rounded-full backdrop-blur pointer-events-none border border-surface-800 shadow-lg z-30 flex items-center gap-3">
+          <span><span className="text-primary-400">Drag</span> to Move</span>
+          <span className="w-1 h-1 bg-surface-700 rounded-full"></span>
+          <span><span className="text-primary-400">Q/E</span> to Rotate</span>
+          <span className="w-1 h-1 bg-surface-700 rounded-full"></span>
+          <span><span className="text-primary-400">W</span> to Flip</span>
       </div>
     </div>
   );
