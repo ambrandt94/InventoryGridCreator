@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import ResizableSidebar from './ResizableSidebar'; // Import the ResizableSidebar component
 import { 
   Save, Upload, Plus, 
   Trash2, Grid3X3, Box, Settings, LayoutGrid,
@@ -112,6 +113,8 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
   const [matrix, setMatrix] = useState(initialData?.shape || Array(4).fill(Array(4).fill(1)));
   const [name, setName] = useState(initialData?.name || '');
   const [color, setColor] = useState(initialData?.color || '#6366f1');
+  const [maxWeight, setMaxWeight] = useState(initialData?.maxWeight || 0);
+  const [weight, setWeight] = useState(initialData?.weight || 0); // New state for weight
   
   // Image State
   const [image, setImage] = useState(initialData?.image || null);
@@ -216,8 +219,9 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
       id: initialData?.id || generateId(),
       name,
       shape: matrix,
-      color: type === 'item' ? color : undefined,
       type,
+      ...(type === 'item' && { color, weight }), // also include weight for items
+      ...(type === 'container' && { maxWeight }), // only include maxWeight for containers
       image,
       imageConfig: image ? { x: imgOffset.x, y: imgOffset.y, scale: imgScale, panOffset: imgPanOffset, zoom: imgZoom } : null
     });
@@ -278,10 +282,9 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
                         key={`${r}-${c}`}
                         onClick={() => toggleCell(r, c)}
                         className={`w-[30px] h-[30px] border border-surface-600/50 cursor-pointer rounded-sm hover:ring-2 ring-on-background/50 transition-all z-20 ${
-                        cell === 1 
-                            ? (type === 'item' ? 'bg-primary-500/50' : 'bg-surface-200/50') 
-                            : 'bg-transparent'
-                        }`}
+                                                cell === 1
+                                                    ? (type === 'item' ? 'bg-primary-500 border-primary-400 border-2' : 'bg-surface-200 border-surface-400 border-2')
+                                                    : 'bg-transparent opacity-30'                        }`}
                     />
                     )))
                     }
@@ -363,7 +366,19 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
                     </div>
                 </div>
                 )}
-
+                {type === 'container' && (
+                    <div>
+                        <label className="text-xs text-on-surface block mb-1">Max Weight (lbs)</label>
+                        <input 
+                            type="number" 
+                            step="0.1" 
+                            value={maxWeight} 
+                            onChange={e => setMaxWeight(Number(e.target.value))} 
+                            className="w-full bg-background text-on-background p-2 rounded border border-surface-700 focus:border-primary-500 outline-none text-sm" 
+                            placeholder="Ex: 10.0"
+                        />
+                    </div>
+                )}
                 {type === 'item' && (
                     <div className="pt-4 border-t border-surface-700">
                         <label className="text-xs font-bold text-on-surface flex items-center gap-2 mb-2"><ImageIcon size={14}/> Image Asset</label>
@@ -403,31 +418,59 @@ const ShapeEditor = ({ onSave, initialData = null, type = 'item', onClose }) => 
             </div>
         </div>
 
+
+
         <div className="flex justify-end gap-2 pt-4 border-t border-surface-700 mt-auto">
+
           <button onClick={onClose} className="px-4 py-2 text-on-surface hover:bg-surface-700 rounded transition-colors">Cancel</button>
+
           <button onClick={handleSave} className="px-4 py-2 bg-primary text-on-background hover:bg-primary-500 rounded font-bold transition-colors shadow-lg shadow-primary/20">Save Asset</button>
+
         </div>
+
       </div>
+
     </div>
+
   );
+
 };
 
 // --- Main Application ---
 
-export default function App() {
-  const [itemDefs, setItemDefs] = useState(() => loadFromLocalStorage('gridForge_itemDefs', [
-    { id: 'i1', name: 'Long Sword', type: 'item', color: '#ef4444', shape: [[1], [1], [1]] },
-    { id: 'i2', name: 'Shield', type: 'item', color: '#3b82f6', shape: [[1, 1], [1, 1]] },
-    { id: 'i3', name: 'Potion', type: 'item', color: '#ec4899', shape: [[1]] },
-  ]));
 
-  const [containerDefs, setContainerDefs] = useState(() => loadFromLocalStorage('gridForge_containerDefs', [
-    { id: 'c1', name: 'Backpack', type: 'container', shape: Array(6).fill(Array(8).fill(1)) },
-  ]));
+// --- Initial Default Data ---
+const INITIAL_ITEM_DEFS = [
+    { id: 'i1', name: 'Long Sword', type: 'item', color: '#ef4444', shape: [[1], [1], [1]], weight: 3.5 },
+    { id: 'i2', name: 'Wooden Shield', type: 'item', color: '#3b82f6', shape: [[1, 1], [1, 1]], weight: 2.0 },
+    { id: 'i3', name: 'Healing Potion', type: 'item', color: '#ec4899', shape: [[1]], weight: 0.2 },
+    { id: 'i4', name: 'Leather Armor', type: 'item', color: '#8b5c2e', shape: [[1, 1], [1, 1], [1, 1]], weight: 5.0 },
+    { id: 'i5', name: 'Bow and Arrow', type: 'item', color: '#22c55e', shape: [[1, 1, 1, 1]], weight: 1.5 },
+    { id: 'i6', name: 'Spellbook', type: 'item', color: '#a855f7', shape: [[1, 1], [1, 1]], weight: 1.0 },
+    { id: 'i7', name: 'Gold Coins', type: 'item', color: '#eab308', shape: [[1]], weight: 0.1 },
+    { id: 'i8', name: 'Torch', type: 'item', color: '#f97316', shape: [[1], [1]], weight: 0.5 },
+    { id: 'i9', name: 'Rope', type: 'item', color: '#94a3b8', shape: [[1], [1], [1]], weight: 0.8 },
+];
 
-  const [activeContainers, setActiveContainers] = useState(() => loadFromLocalStorage('gridForge_activeContainers', [
+const INITIAL_CONTAINER_DEFS = [
+    { id: 'c1', name: "Adventurer's Backpack", type: 'container', shape: Array(6).fill(Array(8).fill(1)), maxWeight: 10.0 }, // 6x8
+    { id: 'c2', name: "Alchemist's Satchel", type: 'container', shape: Array(4).fill(Array(4).fill(1)), maxWeight: 2.0 }, // 4x4
+    { id: 'c3', name: "Treasure Chest", type: 'container', shape: Array(5).fill(Array(6).fill(1)), maxWeight: 50.0 }, // 5x6
+    { id: 'c4', name: "Quiver", type: 'container', shape: Array(2).fill(Array(5).fill(1)), maxWeight: 5.0 }, // 2x5
+    { id: 'c5', name: "Scroll Case", type: 'container', shape: Array(1).fill(Array(3).fill(1)), maxWeight: 0.5 }, // 1x3
+    { id: 'c6', name: "Potion Belt", type: 'container', shape: Array(1).fill(Array(4).fill(1)), maxWeight: 1.0 }, // 1x4
+];
+
+const INITIAL_ACTIVE_CONTAINERS = [
     { instanceId: 'ac1', defId: 'c1', items: [] } // Default if nothing in localStorage
-  ]));
+];
+
+export default function App() {
+  const [itemDefs, setItemDefs] = useState(() => loadFromLocalStorage('gridForge_itemDefs', INITIAL_ITEM_DEFS));
+
+  const [containerDefs, setContainerDefs] = useState(() => loadFromLocalStorage('gridForge_containerDefs', INITIAL_CONTAINER_DEFS));
+
+  const [activeContainers, setActiveContainers] = useState(() => loadFromLocalStorage('gridForge_activeContainers', INITIAL_ACTIVE_CONTAINERS));
   const [dragState, setDragState] = useState(null); 
   const [hoverTarget, setHoverTarget] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -794,81 +837,146 @@ export default function App() {
     let ghostCells = [];
     let isValidPlacement = false;
 
-    if (dragState && hoverTarget && hoverTarget.containerId === containerInstance.instanceId) {
-      const centerOffset = getCenterCellOffset(dragState.item.currentShape);
-      const targetX = hoverTarget.x - centerOffset.x;
-      const targetY = hoverTarget.y - centerOffset.y;
-
-      ghostCells = getItemOccupiedCells(dragState.item.currentShape, targetX, targetY);
-      isValidPlacement = canPlaceItem(
-        { ...containerInstance, shape: containerDef.shape }, 
-        dragState.item.currentShape, 
-        targetX, 
-        targetY
-      );
-    }
-
+        if (dragState && hoverTarget && hoverTarget.containerId === containerInstance.instanceId) {
+          const centerOffset = getCenterCellOffset(dragState.item.currentShape);
+          const targetX = hoverTarget.x - centerOffset.x;
+          const targetY = hoverTarget.y - centerOffset.y;
+    
+          ghostCells = getItemOccupiedCells(dragState.item.currentShape, targetX, targetY);
+          isValidPlacement = canPlaceItem(
+            { ...containerInstance, shape: containerDef.shape },
+            dragState.item.currentShape,
+            targetX,
+            targetY
+          );
+        }
+    
+        const WeightDisplay = () => {
+            const currentWeight = containerInstance.items.reduce((sum, item) => {
+                const def = itemDefs.find(d => d.id === item.defId);
+                return sum + (def?.weight || 0);
+            }, 0);
+            const displayMaxWeight = containerDef.maxWeight ?? 0;
+            const comparisonMaxWeight = containerDef.maxWeight === undefined || containerDef.maxWeight === null ? Infinity : containerDef.maxWeight;
+    
+            const isOverweight = currentWeight > comparisonMaxWeight;
+            const overweightAmount = (currentWeight - comparisonMaxWeight).toFixed(1);
+    
+            const weightPercentage = displayMaxWeight === 0 ? 0 : (currentWeight / displayMaxWeight) * 100;
+    
+            return (
+                <div className="flex flex-col items-end">
+                    <span className={`text-sm font-semibold ${isOverweight ? 'text-red-400' : 'text-on-background'}`}>
+                        {currentWeight.toFixed(1)} / {displayMaxWeight.toFixed(1)} lbs
+                    </span>
+                    {isOverweight && (
+                        <span className="text-red-400 text-xs font-medium -mt-1">
+                            Overweight by {overweightAmount} lbs
+                        </span>
+                    )}
+                    <div className="w-full h-2 bg-surface-700 rounded-full mt-1 overflow-hidden">
+                        <div
+                            className={`h-full rounded-full transition-all duration-300 ${isOverweight ? 'bg-red-500' : 'bg-primary-500'}`}
+                            style={{ width: `${Math.min(weightPercentage, 100)}%` }} // Cap at 100% visually
+                        ></div>
+                    </div>
+                </div>
+            );
+        };
     return (
       <div 
         onMouseLeave={() => setHoverTarget(null)}
         className="relative bg-surface/50 p-3 rounded-xl border border-surface-700 shadow-inner inline-block backdrop-blur-sm"
       >
-        <div className="flex justify-between items-center mb-3 text-on-surface text-xs uppercase tracking-wider font-bold">
-            <span className="flex items-center gap-2"><Box size={14} className="text-primary-400"/> {containerDef.name}</span>
-            <div className="flex gap-1 bg-surface-800 rounded p-0.5">
-                <button title="Auto Sort" onClick={() => autoSort(containerInstance.instanceId)} className="p-1 hover:bg-primary hover:text-on-background rounded transition-colors text-on-surface"><LayoutGrid size={14} /></button>
-                <div className="w-px bg-surface-700 mx-0.5"></div>
-                <button title="Delete Container" onClick={() => setActiveContainers(prev => prev.filter(c => c.instanceId !== containerInstance.instanceId))} className="p-1 hover:bg-red-500 hover:text-on-background rounded transition-colors text-on-surface"><Trash2 size={14} /></button>
-            </div>
-        </div>
-
-        {/* This div wraps the grid and carries the ID for hover detection */}
-        <div 
-            style={gridStyle} 
-            className="relative"
-            data-drop-container-id={containerInstance.instanceId}
-        >
-
-          {containerDef.shape.map((row, y) => (
-            row.map((cell, x) => {
-              const isGhost = ghostCells.some(g => g.x === x && g.y === y);
-              
-              return (
-                <div 
-                  key={`cell-${x}-${y}`}
-                                    className={`
-                                      rounded transition-colors duration-75 z-10
-                                      ${isGhost
-                                          ? `opacity-100 ${isValidPlacement ? 'bg-emerald-500/30 border-emerald-400' : 'bg-red-500/30 border-red-400'}` // Reduced opacity for ghost cells
-                                          : cell === 1
-                                              ? `bg-surface-800/70 border border-surface-700/50 ${dragState ? 'hover:bg-surface-700 hover:border-surface-500' : ''}` // Reduced opacity for normal cells
-                                              : 'opacity-0'
-                                      }
-                                    `}                  style={{ width: scale, height: scale }}
-                />
-              );
-            })
-          ))}
-
-          {containerInstance.items.map(item => {
-             const top = item.y * (scale + GAP);
-             const left = item.x * (scale + GAP);
-             const width = item.currentShape[0].length * scale + (item.currentShape[0].length - 1) * GAP;
-             const height = item.currentShape.length * scale + (item.currentShape.length - 1) * GAP;
-
-             return (
-               <div
-                 key={item.instanceId}
-                 onMouseDown={(e) => handleMouseDown(e, item, containerInstance.instanceId)}
-                 className="absolute z-10 transition-filter pointer-events-none" 
-                 style={{ top, left, width, height }}
-               >
-                 <ItemVisual item={item} visualSettings={visualSettings} isInteractive={true} />
-               </div>
-             );
-          })}
-        </div>
-      </div>
+                <div className="flex justify-between items-center mb-3 text-on-surface text-xs uppercase tracking-wider font-bold">
+                    <span className="flex items-center gap-2"><Box size={14} className="text-primary-400"/> {containerDef.name}</span>
+                    <div className="flex gap-1 bg-surface-800 rounded p-0.5">
+                        <button title="Auto Sort" onClick={() => autoSort(containerInstance.instanceId)} className="p-1 hover:bg-primary hover:text-on-background rounded transition-colors text-on-surface"><LayoutGrid size={14} /></button>
+                        <div className="w-px bg-surface-700 mx-0.5"></div>
+                        <button title="Delete Container" onClick={() => setActiveContainers(prev => prev.filter(c => c.instanceId !== containerInstance.instanceId))} className="p-1 hover:bg-red-500 hover:text-on-background rounded transition-colors text-on-surface"><Trash2 size={14} /></button>
+                    </div>
+                </div>
+        
+                {/* This div wraps the grid and carries the ID for hover detection */}
+                <div
+                    style={gridStyle}
+                    className="relative"
+                    data-drop-container-id={containerInstance.instanceId}
+                >
+        
+                  {containerDef.shape.map((row, y) => (
+                    row.map((cell, x) => {
+                      const isGhost = ghostCells.some(g => g.x === x && g.y === y);
+        
+                      return (
+                        <div
+                          key={`cell-${x}-${y}`}
+                                            className={`
+                                              rounded transition-colors duration-75 z-10
+                                              ${isGhost
+                                                  ? `opacity-100 ${isValidPlacement ? 'bg-emerald-500/30 border-emerald-400' : 'bg-red-500/30 border-red-400'}` // Reduced opacity for ghost cells
+                                                  : cell === 1
+                                                      ? `bg-surface-800/70 border border-surface-700/50 ${dragState ? 'hover:bg-surface-700 hover:border-surface-500' : ''}` // Reduced opacity for normal cells
+                                                      : 'opacity-0'
+                                              }
+                                            `}                  style={{ width: scale, height: scale }}
+                        />
+                      );
+                    })
+                  ))}
+        
+                  {containerInstance.items.map(item => {
+                     const top = item.y * (scale + GAP);
+                     const left = item.x * (scale + GAP);
+                     const width = item.currentShape[0].length * scale + (item.currentShape[0].length - 1) * GAP;
+                     const height = item.currentShape.length * scale + (item.currentShape.length - 1) * GAP;
+        
+                     return (
+                       <div
+                         key={item.instanceId}
+                         onMouseDown={(e) => handleMouseDown(e, item, containerInstance.instanceId)}
+                         className="absolute z-10 transition-filter pointer-events-none"
+                         style={{ top, left, width, height }}
+                       >
+                         <ItemVisual item={item} visualSettings={visualSettings} isInteractive={true} />
+                       </div>
+                     );
+                  })}
+                </div>
+                <div className="mt-4 pt-3 border-t border-surface-700/50">
+                    {(() => {
+                        const currentWeight = containerInstance.items.reduce((sum, item) => {
+                            const def = itemDefs.find(d => d.id === item.defId);
+                            return sum + (def?.weight || 0);
+                        }, 0);
+                        const displayMaxWeight = containerDef.maxWeight ?? 0;
+                        const comparisonMaxWeight = containerDef.maxWeight === undefined || containerDef.maxWeight === null ? Infinity : containerDef.maxWeight;
+        
+                        const isOverweight = currentWeight > comparisonMaxWeight;
+                        const overweightAmount = (currentWeight - comparisonMaxWeight).toFixed(1);
+        
+                        const weightPercentage = displayMaxWeight === 0 ? 0 : (currentWeight / displayMaxWeight) * 100;
+        
+                        return (
+                            <div className="flex flex-col items-end">
+                                <span className={`text-sm font-semibold ${isOverweight ? 'text-red-400' : 'text-on-background'}`}>
+                                    {currentWeight.toFixed(1)} / {displayMaxWeight.toFixed(1)} lbs
+                                </span>
+                                {isOverweight && (
+                                    <span className="text-red-400 text-xs font-medium -mt-1">
+                                        Overweight by {overweightAmount} lbs
+                                    </span>
+                                )}
+                                <div className="w-full h-2 bg-surface-700 rounded-full mt-1 overflow-hidden">
+                                    <div
+                                        className={`h-full rounded-full transition-all duration-300 ${isOverweight ? 'bg-red-500' : 'bg-primary-500'}`}
+                                        style={{ width: `${Math.min(weightPercentage, 100)}%` }} // Cap at 100% visually
+                                    ></div>
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </div>      </div>
     );
   };
 
@@ -1081,6 +1189,22 @@ export default function App() {
     reader.readAsText(file);
   };
 
+  const resetData = () => {
+    if (!window.confirm("Are you sure you want to reset all data to default? This cannot be undone.")) return;
+
+    setItemDefs(INITIAL_ITEM_DEFS);
+    setContainerDefs(INITIAL_CONTAINER_DEFS);
+    setActiveContainers(INITIAL_ACTIVE_CONTAINERS);
+
+    localStorage.removeItem('gridForge_itemDefs');
+    localStorage.removeItem('gridForge_containerDefs');
+    localStorage.removeItem('gridForge_activeContainers');
+    localStorage.removeItem('gridForge_sortConfig'); // Also reset sort/visual settings
+    localStorage.removeItem('gridForge_visualSettings');
+
+    alert("Data has been reset to defaults.");
+  };
+
   return (
     <div className="min-h-screen bg-background text-on-background font-body selection:bg-primary/30 flex flex-col" onMouseUp={handleMouseUp}>
       
@@ -1107,6 +1231,9 @@ export default function App() {
             <Upload size={16}/> Load
             <input type="file" className="hidden" onChange={loadData} accept=".json"/>
           </label>
+          <button onClick={resetData} className="flex items-center gap-2 text-sm hover:text-on-background text-on-surface transition-colors bg-red-500/20 hover:bg-red-500/30 px-3 py-1.5 rounded-md border border-red-500/40">
+            <Trash2 size={16}/> Reset
+          </button>
         </div>
       </div>
 
@@ -1198,7 +1325,7 @@ export default function App() {
                                     <input 
                                         type="color" 
                                         value={visualSettings.imageFillColor} 
-                                        onChange={e => setVisualSettings({...visualSettings, imageFillColor: e.target.value})}
+                                        onChange={e => setVisualSettings({...visualSettings, color: e.target.value})}
                                         className="w-5 h-5 rounded cursor-pointer border-none bg-transparent"
                                     />
                                 </div>
@@ -1304,6 +1431,7 @@ export default function App() {
                         >
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-xs font-bold text-on-surface group-hover:text-on-background transition-colors">{def.name}</span>
+                              <span className="text-xs text-on-surface group-hover:text-on-background transition-colors opacity-70">({def.weight?.toFixed(1) || '0.0'} lbs)</span>
                               <div className="flex items-center gap-1">
                                 <div className="w-2 h-2 rounded-full mr-2" style={{backgroundColor: def.color}}></div>
                                 
@@ -1403,7 +1531,6 @@ export default function App() {
             </div>
         </div>
       )}
-
       {editorOpen && (
           <ShapeEditor 
             type={editorOpen.type} 
